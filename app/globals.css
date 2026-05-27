@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Prevent text size from changing when rotating to landscape on iOS */
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Smooth scrolling but respect user's motion preferences */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  body {
+    /* Prevents the "double-tap to zoom" delay on mobile */
+    touch-action: manipulation;
+  }
+}
+
+@layer utilities {
+  /* Safe area insets for phones with notches / home indicators (iPhone X+) */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+}
