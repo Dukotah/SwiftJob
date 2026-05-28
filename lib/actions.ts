@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { jobs, clients, invoices, users, jobPhotos } from "@/db/schema";
 import { dollarsToCents, slugify } from "@/lib/utils";
 import { createPaymentLink } from "@/lib/stripe";
+import { sendReviewRequestSms, sendReviewRequestEmail } from "@/lib/review";
 import { eq, and } from "drizzle-orm";
 
 type ActionResult = { success: boolean; error?: string };
@@ -262,19 +263,59 @@ export async function markJobCashPaid(jobId: string) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const now = new Date();
+
   await db
     .update(jobs)
-    .set({ status: "paid", paidAt: new Date(), updatedAt: new Date() })
+    .set({ status: "paid", paidAt: now, updatedAt: now })
     .where(and(eq(jobs.id, jobId), eq(jobs.userId, session.user.id)));
 
-  // Also record it in invoices table
+  // Record it in invoices table
   await db
     .insert(invoices)
-    .values({ jobId, sentVia: "cash", paidAt: new Date() })
+    .values({ jobId, sentVia: "cash", paidAt: now })
     .onConflictDoUpdate({
       target: invoices.jobId,
-      set: { sentVia: "cash", paidAt: new Date() },
+      set: { sentVia: "cash", paidAt: now },
     });
+
+  // ── Review request (same as Stripe webhook path) ───────────────────────────
+  try {
+    const job = await db.query.jobs.findFirst({
+      where: eq(jobs.id, jobId),
+      with: { user: true, client: true },
+    });
+
+    const businessName = job?.user?.businessName ?? "Your service provider";
+    const client       = job?.client;
+
+    if (client && (client.phone || client.email)) {
+      let sent = false;
+
+      if (client.phone) {
+        await sendReviewRequestSms({
+          to: client.phone, clientName: client.name, businessName, jobId,
+        });
+        sent = true;
+      }
+      if (client.email) {
+        await sendReviewRequestEmail({
+          to: client.email, clientName: client.name, businessName, jobId,
+        });
+        sent = true;
+      }
+
+      if (sent) {
+        await db
+          .update(invoices)
+          .set({ reviewRequestSentAt: now })
+          .where(eq(invoices.jobId, jobId));
+      }
+    }
+  } catch (err) {
+    // Don't block the redirect if review request fails
+    console.error("[markJobCashPaid] Review request failed:", err);
+  }
 
   redirect(`/job/${jobId}`);
 }

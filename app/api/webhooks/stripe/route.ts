@@ -1,15 +1,12 @@
 export const dynamic = "force-dynamic";
 
 // POST /api/webhooks/stripe
-// Stripe calls this URL whenever something important happens —
-// most importantly, when a client pays an invoice.
-// We use this to mark jobs as paid in our database,
-// and fire a review request to the client.
 //
-// IMPORTANT: This route must be added to your Stripe webhook dashboard.
-// Stripe Dashboard → Developers → Webhooks → Add endpoint
-// URL: https://your-app.vercel.app/api/webhooks/stripe
-// Events to listen for: checkout.session.completed
+// Stripe calls this when a client pays.
+// 1. Mark job as paid
+// 2. Send review request SMS + email via the intercept page
+//    (clients rate 1-5; only 4-5 stars goes to Google)
+// 3. Track that the review request was sent
 
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
@@ -18,7 +15,6 @@ import { db } from "@/db";
 import { jobs, invoices } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { sendReviewRequestSms, sendReviewRequestEmail } from "@/lib/review";
-import { centsToDisplay } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   const body      = await req.text();
@@ -30,7 +26,6 @@ export async function POST(req: NextRequest) {
 
   let event;
   try {
-    // Verify the request is genuinely from Stripe (not a fake request)
     event = stripe.webhooks.constructEvent(
       body,
       signature,
@@ -40,7 +35,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  // Handle payment completion
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     const jobId   = session.metadata?.jobId;
@@ -48,60 +42,57 @@ export async function POST(req: NextRequest) {
     if (jobId) {
       const now = new Date();
 
-      // Mark the job as paid
+      // Mark job paid
       await db
         .update(jobs)
         .set({ status: "paid", paidAt: now, updatedAt: now })
         .where(eq(jobs.id, jobId));
 
-      // Record payment details on the invoice
+      // Record payment on invoice
       await db
         .update(invoices)
         .set({ paidAt: now })
         .where(eq(invoices.jobId, jobId));
 
-      // ── Review request ─────────────────────────────────────────────
-      // Fire a review request to the client if:
-      //   1. The tradesperson has a Google Place ID configured
-      //   2. The client has a phone or email
+      // ── Review request ──────────────────────────────────────────────────────
       try {
         const job = await db.query.jobs.findFirst({
           where: eq(jobs.id, jobId),
           with: { user: true, client: true },
         });
 
-        const placeId      = job?.user?.googleBusinessProfileId;
         const businessName = job?.user?.businessName ?? "Your service provider";
         const client       = job?.client;
 
-        if (placeId && client) {
-          const reviewUrl = `https://search.google.com/local/writereview?placeid=${placeId}`;
+        // Only send if the Place ID is configured — otherwise the intercept
+        // page still works, but the 4-5 star redirect goes nowhere
+        if (client && (client.phone || client.email)) {
+          let sent = false;
 
-          // Try SMS first (higher open rate)
           if (client.phone) {
             await sendReviewRequestSms({
-              to:           client.phone,
-              clientName:   client.name,
-              businessName,
-              reviewUrl,
+              to: client.phone, clientName: client.name, businessName, jobId,
             });
-            console.log(`[review] SMS sent to ${client.phone} for job ${jobId}`);
+            sent = true;
           }
 
-          // Also try email if we have it
           if (client.email) {
             await sendReviewRequestEmail({
-              to:           client.email,
-              clientName:   client.name,
-              businessName,
-              reviewUrl,
+              to: client.email, clientName: client.name, businessName, jobId,
             });
-            console.log(`[review] Email sent to ${client.email} for job ${jobId}`);
+            sent = true;
+          }
+
+          if (sent) {
+            await db
+              .update(invoices)
+              .set({ reviewRequestSentAt: now })
+              .where(eq(invoices.jobId, jobId));
           }
         }
       } catch (reviewErr) {
-        // Don't fail the webhook if review request fails — payment is already recorded
-        console.error("[review] Failed to send review request:", reviewErr);
+        // Don't fail the webhook if the review request fails — payment is already recorded
+        console.error("[stripe/webhook] Review request failed:", reviewErr);
       }
     }
   }

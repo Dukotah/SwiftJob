@@ -11,6 +11,7 @@ import Link from "next/link";
 import { centsToDisplay, formatDate } from "@/lib/utils";
 import { Pencil, Sparkles } from "lucide-react";
 import { DeleteJobButton } from "./delete-button";
+import { SendReviewButton } from "@/components/send-review-button";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -101,15 +102,24 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </Link>
       )}
 
-      {/* Create Post — AI caption generator, only for jobs with photos */}
-      {job.photos.length > 0 && (
-        <Link
-          href={`/job/${job.id}/content`}
-          className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3.5 rounded-2xl font-bold text-center text-sm active:opacity-90 mb-3 shadow-sm shadow-blue-200"
-        >
-          <Sparkles size={16} />
-          Create Social Post
-        </Link>
+      {/* Create Post — AI caption generator (always available, photos are a bonus) */}
+      <Link
+        href={`/job/${job.id}/content`}
+        className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3.5 rounded-2xl font-bold text-center text-sm active:opacity-90 mb-3 shadow-sm shadow-blue-200"
+      >
+        <Sparkles size={16} />
+        Create Social Post
+      </Link>
+
+      {/* Review request — paid jobs only */}
+      {job.status === "paid" && (
+        <div className="mb-3">
+          <SendReviewButton
+            jobId={job.id}
+            alreadySent={!!job.invoice?.reviewRequestSentAt}
+            hasContactInfo={!!(job.client?.phone || job.client?.email)}
+          />
+        </div>
       )}
 
       {/* Repeat job — pre-fills new job form with same client */}

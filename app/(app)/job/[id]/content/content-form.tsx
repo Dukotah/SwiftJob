@@ -1,72 +1,79 @@
 "use client";
 
-// Content creator form — generates AI captions and helps you post to social media.
-// Platform tabs: Google Business | Instagram | Facebook
+// Content creator — generates AI captions and posts to social media.
+// GBP: posts directly via API (if connected) or deep link fallback.
+// Instagram/Facebook: copy caption + open platform.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Copy, CheckCircle, ExternalLink, AlertCircle, ChevronLeft, Loader2 } from "lucide-react";
+import {
+  Sparkles, Copy, CheckCircle, ExternalLink,
+  AlertCircle, ChevronLeft, Loader2, Send,
+} from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import Link from "next/link";
 
 type Platform = "google_business" | "instagram" | "facebook";
 type Photo    = { storageUrl: string; type: string };
 
-const PLATFORMS: { key: Platform; label: string; emoji: string; shortLabel: string }[] = [
-  { key: "google_business", label: "Google Business",  emoji: "🗺️", shortLabel: "Google" },
-  { key: "instagram",       label: "Instagram",        emoji: "📸", shortLabel: "Instagram" },
-  { key: "facebook",        label: "Facebook",         emoji: "📘", shortLabel: "Facebook" },
+const PLATFORMS: { key: Platform; label: string; emoji: string }[] = [
+  { key: "google_business", label: "Google Business",  emoji: "🗺️" },
+  { key: "instagram",       label: "Instagram",        emoji: "📸" },
+  { key: "facebook",        label: "Facebook",         emoji: "📘" },
 ];
 
 const PLATFORM_TIPS: Record<Platform, string> = {
-  google_business: "Google Business posts help local customers find you. They show up when someone searches for your trade in your area.",
-  instagram:       "Instagram is great for showing off before/after transformations. Post this caption with your photos.",
-  facebook:        "Facebook works well for connecting with your local community and getting referrals from neighbors.",
+  google_business: "Posts to your Google Business Profile directly — shows up in local search results.",
+  instagram:       "Captions are optimized with hashtags. Copy, then post with your photos in the Instagram app.",
+  facebook:        "Conversational local business post. Copy and paste into Facebook.",
 };
 
 interface Props {
-  jobId:       string;
-  description?: string;
-  amount:      string;
-  photos:      Photo[];
-  gbpUrl:      string | null;
-  hasPlaceId:  boolean;
+  jobId:          string;
+  description?:   string;
+  amount:         string;
+  photos:         Photo[];
+  gbpConnected:   boolean;  // true = direct posting; false = deep link
+  hasPlaceId:     boolean;
 }
 
-export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPlaceId }: Props) {
-  const router                = useRouter();
-  const { showToast }         = useToast();
-  const [isPending, startTransition] = useTransition();
+export function ContentForm({
+  jobId, description, amount, photos, gbpConnected, hasPlaceId,
+}: Props) {
+  const router              = useRouter();
+  const { showToast }       = useToast();
+  const [, startTransition] = useTransition();
 
-  const [platform, setPlatform] = useState<Platform>("google_business");
-  const [caption,  setCaption]  = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [copied,   setCopied]   = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  const [platform,  setPlatform]  = useState<Platform>("google_business");
+  const [caption,   setCaption]   = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [posting,   setPosting]   = useState(false);
+  const [posted,    setPosted]    = useState(false);
+  const [copied,    setCopied]    = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
 
   const beforePhoto = photos.find((p) => p.type === "before");
   const afterPhoto  = photos.find((p) => p.type === "after") ??
                       photos.find((p) => p.type === "detail");
 
+  // ── AI caption generation ────────────────────────────────────────────────────
+
   async function handleGenerate() {
     setLoading(true);
     setError(null);
     setCaption("");
+    setPosted(false);
 
     try {
-      const res = await fetch("/api/content/generate", {
-        method: "POST",
+      const res  = await fetch("/api/content/generate", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId, platform }),
+        body:    JSON.stringify({ jobId, platform }),
       });
-
       const data = await res.json();
 
-      if (!res.ok) {
-        setError(data.error ?? "Generation failed");
-      } else {
-        setCaption(data.caption);
-      }
+      if (!res.ok) setError(data.error ?? "Generation failed");
+      else         setCaption(data.caption);
     } catch {
       setError("Connection error. Please try again.");
     } finally {
@@ -74,20 +81,53 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
     }
   }
 
+  // ── Copy to clipboard ────────────────────────────────────────────────────────
+
   async function handleCopy() {
     if (!caption) return;
     await navigator.clipboard.writeText(caption);
     setCopied(true);
     showToast("Caption copied!", "success");
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 2500);
   }
+
+  // ── Direct GBP post ──────────────────────────────────────────────────────────
+
+  async function handleGbpPost() {
+    if (!caption || posting) return;
+    setPosting(true);
+    setError(null);
+
+    try {
+      const res  = await fetch("/api/gbp/post", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ jobId, caption, includePhotos: true }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Failed to post");
+        showToast("Post failed — see details below", "error");
+      } else {
+        setPosted(true);
+        showToast("Posted to Google Business! 🎉", "success");
+      }
+    } catch {
+      setError("Connection error. Please try again.");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-slate-50">
 
       {/* Header */}
       <div className="bg-white px-5 pt-12 pb-5 border-b border-gray-100">
-        <div className="flex items-center gap-3 mb-1">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
             className="w-8 h-8 bg-gray-100 rounded-xl flex items-center justify-center"
@@ -95,7 +135,7 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
             <ChevronLeft size={18} className="text-gray-500" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 leading-tight">Create Post</h1>
+            <h1 className="text-xl font-bold text-gray-900">Create Post</h1>
             <p className="text-xs text-gray-400">{amount} job · AI caption generator</p>
           </div>
         </div>
@@ -107,10 +147,10 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 mb-2">Platform</p>
           <div className="grid grid-cols-3 gap-2">
-            {PLATFORMS.map(({ key, emoji, shortLabel }) => (
+            {PLATFORMS.map(({ key, emoji, label }) => (
               <button
                 key={key}
-                onClick={() => { setPlatform(key); setCaption(""); setError(null); }}
+                onClick={() => { setPlatform(key); setCaption(""); setError(null); setPosted(false); }}
                 className={`flex flex-col items-center gap-1 py-3 rounded-2xl border-2 transition-all text-sm font-semibold ${
                   platform === key
                     ? "border-blue-500 bg-blue-50 text-blue-700"
@@ -118,7 +158,7 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
                 }`}
               >
                 <span className="text-xl">{emoji}</span>
-                <span>{shortLabel}</span>
+                <span className="text-xs">{label.split(" ")[0]}</span>
               </button>
             ))}
           </div>
@@ -127,7 +167,7 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
           </p>
         </div>
 
-        {/* Photos preview */}
+        {/* Photos */}
         {(beforePhoto || afterPhoto) && (
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 mb-2">Job Photos</p>
@@ -154,7 +194,7 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
           </div>
         )}
 
-        {/* Caption generator */}
+        {/* Caption editor */}
         <div>
           <div className="flex items-center justify-between px-1 mb-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Caption</p>
@@ -163,13 +203,12 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
                 onClick={handleCopy}
                 className="flex items-center gap-1 text-xs text-blue-600 font-semibold"
               >
-                {copied ? <CheckCircle size={13} /> : <Copy size={13} />}
+                {copied ? <CheckCircle size={12} /> : <Copy size={12} />}
                 {copied ? "Copied!" : "Copy"}
               </button>
             )}
           </div>
 
-          {/* Error */}
           {error && (
             <div className="bg-red-50 border border-red-100 rounded-2xl p-3 flex items-start gap-2 mb-3">
               <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
@@ -177,39 +216,31 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
             </div>
           )}
 
-          {/* Caption textarea */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              placeholder={loading ? "Generating your caption…" : "Tap Generate to create an AI caption for this post"}
+              placeholder={loading ? "Generating…" : "Tap Generate to create an AI caption for this job"}
               rows={6}
               disabled={loading}
-              className="w-full px-4 pt-4 pb-3 text-sm text-gray-800 leading-relaxed resize-none outline-none disabled:opacity-60 placeholder:text-gray-300"
+              className="w-full px-4 pt-4 pb-3 text-sm text-gray-800 leading-relaxed resize-none outline-none disabled:opacity-50 placeholder:text-gray-300"
             />
             <div className="px-4 pb-4">
               <button
                 onClick={handleGenerate}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3.5 rounded-xl font-bold text-sm active:opacity-90 disabled:opacity-60 transition-opacity shadow-sm"
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3.5 rounded-xl font-bold text-sm active:opacity-90 disabled:opacity-60 shadow-sm"
               >
-                {loading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={16} />
-                    {caption ? "Regenerate Caption" : "Generate Caption with AI"}
-                  </>
-                )}
+                {loading
+                  ? <><Loader2 size={16} className="animate-spin" /> Generating…</>
+                  : <><Sparkles size={16} /> {caption ? "Regenerate" : "Generate Caption with AI"}</>
+                }
               </button>
             </div>
           </div>
         </div>
 
-        {/* Platform action — what to do with the caption */}
+        {/* Post actions — only shown once we have a caption */}
         {caption && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Post It</p>
@@ -217,34 +248,59 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
             {/* Copy button */}
             <button
               onClick={handleCopy}
-              className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-colors border-2 ${
+              className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm border-2 transition-colors ${
                 copied
-                  ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                   : "border-blue-200 bg-blue-50 text-blue-700 active:bg-blue-100"
               }`}
             >
               {copied ? <CheckCircle size={16} /> : <Copy size={16} />}
-              {copied ? "Caption Copied!" : "Copy Caption"}
+              {copied ? "Copied to clipboard!" : "Copy Caption"}
             </button>
 
             {/* Platform-specific action */}
             {platform === "google_business" && (
-              hasPlaceId && gbpUrl ? (
-                <a
-                  href="https://business.google.com/posts/add"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white border-2 border-gray-200 text-gray-700 font-bold text-sm active:bg-gray-50"
-                >
-                  <ExternalLink size={16} />
-                  Open Google Business
-                </a>
+              gbpConnected ? (
+                // Direct posting via GBP API
+                posted ? (
+                  <div className="flex items-center justify-center gap-2 py-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-200 text-emerald-700 font-bold text-sm">
+                    <CheckCircle size={16} />
+                    Posted to Google Business!
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleGbpPost}
+                    disabled={posting}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white border-2 border-gray-200 text-gray-700 font-bold text-sm active:bg-gray-50 disabled:opacity-60"
+                  >
+                    {posting
+                      ? <><Loader2 size={16} className="animate-spin" /> Posting…</>
+                      : <><Send size={16} /> Post to Google Business</>
+                    }
+                  </button>
+                )
               ) : (
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-center">
-                  <p className="text-xs text-amber-700 font-medium">Connect your Google Place ID in Profile to unlock one-tap GBP posting.</p>
-                  <Link href="/profile" className="text-xs text-blue-600 font-bold mt-1 inline-block">
-                    Go to Profile →
-                  </Link>
+                // Deep link fallback + connect prompt
+                <div className="space-y-2">
+                  <a
+                    href="https://business.google.com/posts/add"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white border-2 border-gray-200 text-gray-700 font-bold text-sm"
+                  >
+                    <ExternalLink size={16} />
+                    Open Google Business
+                  </a>
+                  {!hasPlaceId && (
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-center">
+                      <p className="text-xs text-amber-700 font-medium">
+                        Connect GBP in Profile to post directly — no copy-paste needed.
+                      </p>
+                      <Link href="/profile" className="text-xs text-blue-600 font-bold mt-1 inline-block">
+                        Go to Profile →
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )
             )}
@@ -254,7 +310,7 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
                 href="https://www.instagram.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white border-2 border-gray-200 text-gray-700 font-bold text-sm active:bg-gray-50"
+                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white border-2 border-gray-200 text-gray-700 font-bold text-sm"
               >
                 <ExternalLink size={16} />
                 Open Instagram
@@ -266,7 +322,7 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
                 href="https://www.facebook.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white border-2 border-gray-200 text-gray-700 font-bold text-sm active:bg-gray-50"
+                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white border-2 border-gray-200 text-gray-700 font-bold text-sm"
               >
                 <ExternalLink size={16} />
                 Open Facebook
@@ -274,7 +330,9 @@ export function ContentForm({ jobId, description, amount, photos, gbpUrl, hasPla
             )}
 
             <p className="text-xs text-gray-400 text-center">
-              Copy the caption, open the platform, paste and add your photos.
+              {platform === "google_business" && gbpConnected
+                ? "Photos from this job will be included automatically."
+                : "Copy the caption, open the app, paste and add your photos."}
             </p>
           </div>
         )}

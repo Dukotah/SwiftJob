@@ -62,9 +62,18 @@ export const users = pgTable("users", {
   stripeAccountId:      text("stripe_account_id"),
   stripeOnboardingDone: boolean("stripe_onboarding_done").default(false),
 
+  // Google Business Profile — Place ID for review links
   googleBusinessProfileId: text("google_business_profile_id"),
-  googleAccessToken:       text("google_access_token"),
-  googleRefreshToken:      text("google_refresh_token"),
+
+  // GBP OAuth tokens — set via /api/gbp/connect OAuth flow (separate from sign-in)
+  googleAccessToken:  text("google_access_token"),
+  googleRefreshToken: text("google_refresh_token"),
+
+  // GBP account + location identifiers from the GBP API
+  // Format: "accounts/123456789" and "accounts/123456789/locations/987654321"
+  // Populated automatically after OAuth callback
+  gbpAccountName:  text("gbp_account_name"),
+  gbpLocationName: text("gbp_location_name"),
 
   galleryEnabled: boolean("gallery_enabled").default(true),
 
@@ -187,6 +196,26 @@ export const invoices = pgTable("invoices", {
   sentAt:  timestamp("sent_at"),
   paidAt:  timestamp("paid_at"),
 
+  // Automation tracking — prevent duplicate sends
+  reviewRequestSentAt: timestamp("review_request_sent_at"), // When we texted/emailed asking for a review
+  followUpSentAt:      timestamp("follow_up_sent_at"),       // When we sent the 30-day "need anything?" follow-up
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─────────────────────────────────────────────
+// REVIEW FEEDBACK — Private feedback captured when a client rates 1-3 stars.
+// Instead of sending them straight to Google, we intercept and capture
+// their feedback privately so the tradesperson can address it.
+// Only 4-5 star ratings get redirected to the public Google review link.
+// ─────────────────────────────────────────────
+export const reviewFeedback = pgTable("review_feedback", {
+  id:        uuid("id").primaryKey().defaultRandom(),
+  jobId:     uuid("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+
+  rating:  integer("rating").notNull(), // 1–5
+  comment: text("comment"),             // Optional private feedback from the client
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -223,11 +252,12 @@ export const clientsRelations = relations(clients, ({ one, many }) => ({
 }));
 
 export const jobsRelations = relations(jobs, ({ one, many }) => ({
-  user:        one(users,   { fields: [jobs.userId],   references: [users.id] }),
-  client:      one(clients, { fields: [jobs.clientId], references: [clients.id] }),
-  photos:      many(jobPhotos),
-  invoice:     one(invoices,     { fields: [jobs.id], references: [invoices.jobId] }),
-  galleryPost: one(galleryPosts, { fields: [jobs.id], references: [galleryPosts.jobId] }),
+  user:           one(users,          { fields: [jobs.userId],   references: [users.id] }),
+  client:         one(clients,        { fields: [jobs.clientId], references: [clients.id] }),
+  photos:         many(jobPhotos),
+  invoice:        one(invoices,       { fields: [jobs.id], references: [invoices.jobId] }),
+  galleryPost:    one(galleryPosts,   { fields: [jobs.id], references: [galleryPosts.jobId] }),
+  reviewFeedback: one(reviewFeedback, { fields: [jobs.id], references: [reviewFeedback.jobId] }),
 }));
 
 export const jobPhotosRelations = relations(jobPhotos, ({ one }) => ({
@@ -240,6 +270,10 @@ export const invoicesRelations = relations(invoices, ({ one }) => ({
 
 export const galleryPostsRelations = relations(galleryPosts, ({ one }) => ({
   job: one(jobs, { fields: [galleryPosts.jobId], references: [jobs.id] }),
+}));
+
+export const reviewFeedbackRelations = relations(reviewFeedback, ({ one }) => ({
+  job: one(jobs, { fields: [reviewFeedback.jobId], references: [jobs.id] }),
 }));
 
 // ─────────────────────────────────────────────
@@ -255,5 +289,6 @@ export type Job          = typeof jobs.$inferSelect;
 export type NewJob       = typeof jobs.$inferInsert;
 export type JobPhoto     = typeof jobPhotos.$inferSelect;
 export type NewJobPhoto  = typeof jobPhotos.$inferInsert;
-export type Invoice      = typeof invoices.$inferSelect;
-export type NewInvoice   = typeof invoices.$inferInsert;
+export type Invoice        = typeof invoices.$inferSelect;
+export type NewInvoice     = typeof invoices.$inferInsert;
+export type ReviewFeedback = typeof reviewFeedback.$inferSelect;

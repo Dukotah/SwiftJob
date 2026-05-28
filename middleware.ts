@@ -7,7 +7,8 @@ const ALWAYS_PUBLIC = [
   "/api/auth",
   "/api",
   "/_next",
-  "/pay/",       // client-facing invoice pay page
+  "/pay/",    // client-facing invoice pay page
+  "/review/", // client-facing review intercept page
 ];
 
 // Top-level path segments that belong to the authenticated app.

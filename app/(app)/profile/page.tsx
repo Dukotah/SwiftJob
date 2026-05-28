@@ -12,9 +12,9 @@ import Link from "next/link";
 export default async function ProfilePage({
   searchParams,
 }: {
-    searchParams: Promise<{ stripe?: string; review?: string }>;
+    searchParams: Promise<{ stripe?: string; review?: string; gbp?: string }>;
 }) {
-    const { stripe: stripeStatus, review: reviewStatus } = await searchParams;
+    const { stripe: stripeStatus, review: reviewStatus, gbp: gbpStatus } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -77,6 +77,28 @@ export default async function ProfilePage({
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
             <CheckCircle size={20} className="text-emerald-600 shrink-0" />
             <p className="text-sm text-emerald-700 font-medium">Review automation saved! Clients will be asked for a review after they pay.</p>
+          </div>
+        )}
+        {gbpStatus === "connected" && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
+            <CheckCircle size={20} className="text-emerald-600 shrink-0" />
+            <p className="text-sm text-emerald-700 font-medium">Google Business connected! You can now post directly from job detail pages.</p>
+          </div>
+        )}
+        {(gbpStatus === "error" || gbpStatus === "denied") && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
+            <AlertCircle size={20} className="text-red-500 shrink-0" />
+            <p className="text-sm text-red-700 font-medium">
+              {gbpStatus === "denied"
+                ? "Google Business connection was cancelled."
+                : "Failed to connect Google Business. Please try again."}
+            </p>
+          </div>
+        )}
+        {gbpStatus === "no_account" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
+            <AlertCircle size={20} className="text-amber-500 shrink-0" />
+            <p className="text-sm text-amber-700 font-medium">No Google Business account found. Make sure you&apos;re signed in with the right Google account.</p>
           </div>
         )}
 
@@ -197,25 +219,27 @@ export default async function ProfilePage({
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 mb-2">Online Presence</p>
           <div className="card overflow-hidden divide-y divide-gray-100">
 
-            {/* Google Business */}
-            <div className="flex items-center gap-4 px-4 py-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${user.googleBusinessProfileId ? "bg-emerald-50" : "bg-yellow-50"}`}>
-                <Star size={20} className={user.googleBusinessProfileId ? "text-emerald-500" : "text-yellow-500"} />
+            {/* Google Business — direct posting via API */}
+            <div className="flex items-start gap-4 px-4 py-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${user.gbpLocationName ? "bg-emerald-50" : "bg-yellow-50"}`}>
+                <Star size={20} className={user.gbpLocationName ? "text-emerald-500" : "text-yellow-500"} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-900 text-sm">
-                  {user.googleBusinessProfileId ? "Google Business Connected" : "Google Business Profile"}
+                  {user.gbpLocationName ? "GBP Auto-Posting Active" : "Google Business Posting"}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Auto-post before/after photos to boost local rankings
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                  {user.gbpLocationName
+                    ? "Post directly to Google Business from any job — one tap."
+                    : "Connect once to post before/after photos directly to Google Business."}
                 </p>
               </div>
-              {user.googleBusinessProfileId ? (
-                <CheckCircle size={18} className="text-emerald-500 shrink-0" />
+              {user.gbpLocationName ? (
+                <CheckCircle size={18} className="text-emerald-500 shrink-0 mt-0.5" />
               ) : (
                 <a
-                  href="/api/auth/google-business"
-                  className="shrink-0 text-blue-600 text-xs font-bold whitespace-nowrap"
+                  href="/api/gbp/connect"
+                  className="shrink-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-2 rounded-xl whitespace-nowrap active:bg-yellow-500"
                 >
                   Connect →
                 </a>

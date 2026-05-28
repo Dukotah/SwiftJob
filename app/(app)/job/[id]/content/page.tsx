@@ -30,10 +30,13 @@ export default async function ContentPage({
     type:       p.type,
   }));
 
-  const placeId = job.user?.googleBusinessProfileId ?? null;
-  const gbpUrl  = placeId
-    ? `https://search.google.com/local/writereview?placeid=${placeId}`
-    : null;
+  // gbpConnected = true if the user has done the GBP OAuth flow
+  // (they have a refresh token + location name stored)
+  const gbpConnected = !!(
+    job.user?.googleRefreshToken && job.user?.gbpLocationName
+  );
+
+  const hasPlaceId = !!job.user?.googleBusinessProfileId;
 
   return (
     <ContentForm
@@ -41,8 +44,8 @@ export default async function ContentPage({
       description={job.description ?? undefined}
       amount={centsToDisplay(job.totalAmountCents)}
       photos={photos}
-      gbpUrl={gbpUrl}
-      hasPlaceId={!!placeId}
+      gbpConnected={gbpConnected}
+      hasPlaceId={hasPlaceId}
     />
   );
 }
