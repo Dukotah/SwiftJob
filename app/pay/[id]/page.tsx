@@ -16,10 +16,19 @@ export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Metadata> {
   const { id } = await params;
-  const job = await db.query.jobs.findFirst({
-    where: eq(jobs.id, id),
-    with: { user: true },
-  });
+
+    // Guard: must be a valid UUID before hitting the database
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(id)) return { title: "Invoice" };
+    let job;
+    try {
+      job = await db.query.jobs.findFirst({
+        where: eq(jobs.id, id),
+        with: { user: true },
+      });
+    } catch {
+      return { title: "Invoice" };
+    }
   if (!job) return { title: "Invoice" };
   const biz = job.user?.businessName ?? "SwiftJobs";
   return {
@@ -33,10 +42,18 @@ export async function generateMetadata(
 export default async function PayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const job = await db.query.jobs.findFirst({
-    where: eq(jobs.id, id),
-    with: { user: true, client: true, photos: true, invoice: true },
-  });
+  // Guard: must be a valid UUID before hitting the database
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_REGEX.test(id)) notFound();
+  let job;
+  try {
+    job = await db.query.jobs.findFirst({
+      where: eq(jobs.id, id),
+      with: { user: true, client: true, photos: true, invoice: true },
+    });
+  } catch {
+    notFound();
+  }
 
   if (!job) notFound();
 
