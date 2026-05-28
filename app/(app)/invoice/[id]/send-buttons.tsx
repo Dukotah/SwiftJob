@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare, Mail, Link2, Share2, Banknote, Check, ChevronRight, AlertCircle } from "lucide-react";
+import { MessageSquare, Mail, Share2, Banknote, Check, ChevronRight, AlertCircle } from "lucide-react";
 import { markJobCashPaid } from "@/lib/actions";
 
 function isNextInternalError(err: unknown): boolean {

@@ -15,7 +15,7 @@ import {
   AlertCircle,
   DollarSign,
   ChevronRight,
-  BarChart2,
+  Users,
   CreditCard,
   Camera,
   Plus,
@@ -207,14 +207,14 @@ export default async function HomePage() {
               </div>
             </div>
           </Link>
-          <Link href="/analytics">
+          <Link href="/clients">
             <div className="card p-4 flex items-center gap-3 active:bg-gray-50 transition-colors h-full">
               <div className="w-9 h-9 bg-purple-50 rounded-xl flex items-center justify-center shrink-0">
-                <BarChart2 size={16} className="text-purple-600" />
+                <Users size={16} className="text-purple-600" />
               </div>
               <div>
-                <p className="font-semibold text-gray-900 text-sm">Analytics</p>
-                <p className="text-xs text-gray-400">Revenue trends</p>
+                <p className="font-semibold text-gray-900 text-sm">Clients</p>
+                <p className="text-xs text-gray-400">Your customer list</p>
               </div>
             </div>
           </Link>

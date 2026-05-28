@@ -196,7 +196,7 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
               <div className="px-5 pb-5">
                 <a
                   href={paymentUrl}
-                  className="block w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-center text-lg active:bg-blue-700 transition-colors shadow-sm shadow-blue-200 flex items-center justify-center gap-2"
+                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-center text-lg active:bg-blue-700 transition-colors shadow-sm shadow-blue-200 flex items-center justify-center gap-2"
                 >
                   Pay {centsToDisplay(job.totalAmountCents)}
                   <ExternalLink size={18} />
