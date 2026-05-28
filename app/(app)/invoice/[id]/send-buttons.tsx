@@ -28,7 +28,9 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
   const [cashError,  setCashError]  = useState<string | null>(null);
 
   const firstName = clientName.split(" ")[0];
-  const shareUrl  = paymentUrl ?? (typeof window !== "undefined" ? `${window.location.origin}/pay/${jobId}` : "");
+  // Always share the branded /pay/[id] page — clients see your business
+  // name and photos before the Stripe checkout.
+  const shareUrl  = typeof window !== "undefined" ? `${window.location.origin}/pay/${jobId}` : `/pay/${jobId}`;
 
   async function send(method: "sms" | "email") {
     if (method === "sms")   setSmsSent("sending");

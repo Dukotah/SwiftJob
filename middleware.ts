@@ -1,23 +1,46 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
+// Routes that require no authentication
+const ALWAYS_PUBLIC = [
+  "/login",
+  "/api/auth",
+  "/api",
+  "/_next",
+  "/pay/",       // client-facing invoice pay page
+];
+
+// Top-level path segments that belong to the authenticated app.
+// Anything else (single-segment paths like /{username}) is treated as the
+// public gallery, so it's allowed through for unauthenticated visitors.
+const APP_SEGMENTS = new Set([
+  "home", "job", "invoice", "profile", "clients",
+  "jobs", "onboarding", "dev", "pay",
+]);
+
 export default auth((req) => {
   const { nextUrl } = req;
-  const session = req.auth;
+  const session     = req.auth;
+  const isLoggedIn  = !!session?.user?.id;
+  const path        = nextUrl.pathname;
 
-  const isLoggedIn   = !!session?.user?.id;
-  const isAuthRoute  = nextUrl.pathname.startsWith("/login") || nextUrl.pathname.startsWith("/api/auth");
-  const isOnboarding = nextUrl.pathname === "/onboarding";
-  const isPublic     = nextUrl.pathname.startsWith("/api") || nextUrl.pathname.startsWith("/_next");
+  // Always-public paths (API, Next internals, login, pay page)
+  if (ALWAYS_PUBLIC.some((p) => path.startsWith(p))) {
+    return NextResponse.next();
+  }
 
-  if (isAuthRoute || isPublic) return NextResponse.next();
+  // Public gallery — single-segment paths like /dukes-pressure-washing
+  const segments    = path.split("/").filter(Boolean);
+  const isGallery   = segments.length === 1 && !APP_SEGMENTS.has(segments[0]);
+  if (isGallery) return NextResponse.next();
 
+  // Everything else requires auth
   if (!isLoggedIn) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
-  // businessName is already on the session — no extra DB query needed.
-  if (!isOnboarding && !session.user.businessName) {
+  // New users who haven't completed onboarding yet
+  if (path !== "/onboarding" && !session.user.businessName) {
     return NextResponse.redirect(new URL("/onboarding", nextUrl));
   }
 

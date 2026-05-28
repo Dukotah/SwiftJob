@@ -40,9 +40,11 @@ export async function POST(
     where: eq(users.id, session.user.id),
   });
 
-  const fromName   = user?.businessName ?? user?.name ?? "Your service provider";
-  const amount     = centsToDisplay(job.totalAmountCents);
-  const paymentUrl = job.invoice?.stripePaymentLinkUrl ?? `${process.env.NEXT_PUBLIC_APP_URL}/pay/${jobId}`;
+  const fromName    = user?.businessName ?? user?.name ?? "Your service provider";
+  const amount      = centsToDisplay(job.totalAmountCents);
+  // Always send the branded /pay/[id] page — it shows photos, description,
+  // and a Pay Now button that links to Stripe. Clients land on your brand first.
+  const paymentUrl  = `${process.env.NEXT_PUBLIC_APP_URL}/pay/${jobId}`;
   const description = job.description ?? "Service";
 
   try {
