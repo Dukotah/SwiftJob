@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 // POST /api/invoices/[id]/send
 // Called by the send buttons on the invoice page.
 // Sends the invoice via SMS or email and updates the invoice record.
