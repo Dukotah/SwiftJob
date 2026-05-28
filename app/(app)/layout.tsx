@@ -1,8 +1,10 @@
 "use client";
 
-import { Home, Plus, User } from "lucide-react";
+import { Home, Plus, User, Terminal } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
+const SHOW_DEV = process.env.NEXT_PUBLIC_SHOW_DEV_BUTTON === "true";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -54,6 +56,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <span className="w-1 h-1 rounded-full bg-blue-600 mt-0.5" />
             )}
           </Link>
+
+          {/* Dev — only visible when NEXT_PUBLIC_SHOW_DEV_BUTTON=true */}
+          {SHOW_DEV && (
+            <Link href="/dev" className="flex flex-col items-center gap-0.5 px-5 py-1 min-w-[60px]">
+              <Terminal
+                size={22}
+                className={pathname === "/dev" ? "text-violet-600" : "text-gray-400"}
+                strokeWidth={pathname === "/dev" ? 2.5 : 1.8}
+              />
+              <span className={`text-[10px] font-semibold ${pathname === "/dev" ? "text-violet-600" : "text-gray-400"}`}>
+                Dev
+              </span>
+              {pathname === "/dev" && (
+                <span className="w-1 h-1 rounded-full bg-violet-600 mt-0.5" />
+              )}
+            </Link>
+          )}
 
         </div>
       </nav>
