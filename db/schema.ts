@@ -6,8 +6,10 @@ import {
   boolean,
   pgEnum,
   uuid,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import type { AdapterAccountType } from "next-auth/adapters";
 
 // ─────────────────────────────────────────────
 // ENUMS
@@ -38,29 +40,32 @@ export const sentViaEnum = pgEnum("sent_via", [
 
 // ─────────────────────────────────────────────
 // USERS — The tradesperson (your paying customer)
+// Auth.js requires: id, name, email, emailVerified, image
+// Everything else is SwiftJobs custom fields.
 // ─────────────────────────────────────────────
 export const users = pgTable("users", {
-  id:           uuid("id").primaryKey().defaultRandom(),
-  name:         text("name").notNull(),
-  email:        text("email").notNull().unique(),
+  // Required by Auth.js
+  id:            text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name:          text("name"),
+  email:         text("email").unique(),
+  emailVerified: timestamp("email_verified", { mode: "date" }),
+  image:         text("image"),
+
+  // SwiftJobs custom fields
   phone:        text("phone"),
   businessName: text("business_name"),
-  tradeType:    text("trade_type"),    // "pressure_washing", "detailing", "landscaping", etc.
+  tradeType:    text("trade_type"),
   city:         text("city"),
   state:        text("state"),
-  username:     text("username").unique(), // For public gallery: swiftjobs.app/[username]
+  username:     text("username").unique(),
 
-  // Stripe Connect — this is HOW the tradesperson gets paid to their bank
-  // Each user has their own Stripe account; you take a platform fee
-  stripeAccountId:       text("stripe_account_id"),
-  stripeOnboardingDone:  boolean("stripe_onboarding_done").default(false),
+  stripeAccountId:      text("stripe_account_id"),
+  stripeOnboardingDone: boolean("stripe_onboarding_done").default(false),
 
-  // Google Business Profile — for auto-posting after/before photos
   googleBusinessProfileId: text("google_business_profile_id"),
   googleAccessToken:       text("google_access_token"),
   googleRefreshToken:      text("google_refresh_token"),
 
-  // Whether their completed jobs are visible on their public gallery page
   galleryEnabled: boolean("gallery_enabled").default(true),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -68,11 +73,55 @@ export const users = pgTable("users", {
 });
 
 // ─────────────────────────────────────────────
+// AUTH TABLES — Required by Auth.js
+// Don't edit these unless you know what you're doing.
+// ─────────────────────────────────────────────
+
+// Stores each OAuth provider connection per user (e.g. Google account linked)
+export const authAccounts = pgTable(
+  "accounts",
+  {
+    userId:            text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    type:              text("type").$type<AdapterAccountType>().notNull(),
+    provider:          text("provider").notNull(),
+    providerAccountId: text("provider_account_id").notNull(),
+    refresh_token:     text("refresh_token"),
+    access_token:      text("access_token"),
+    expires_at:        integer("expires_at"),
+    token_type:        text("token_type"),
+    scope:             text("scope"),
+    id_token:          text("id_token"),
+    session_state:     text("session_state"),
+  },
+  (account) => [
+    primaryKey({ columns: [account.provider, account.providerAccountId] }),
+  ]
+);
+
+// Tracks active login sessions
+export const authSessions = pgTable("sessions", {
+  sessionToken: text("session_token").primaryKey(),
+  userId:       text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expires:      timestamp("expires", { mode: "date" }).notNull(),
+});
+
+// One-time tokens sent in magic link emails — deleted after use
+export const authVerificationTokens = pgTable(
+  "verification_tokens",
+  {
+    identifier: text("identifier").notNull(),
+    token:      text("token").notNull(),
+    expires:    timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (vt) => [primaryKey({ columns: [vt.identifier, vt.token] })]
+);
+
+// ─────────────────────────────────────────────
 // CLIENTS — The tradesperson's customers
 // ─────────────────────────────────────────────
 export const clients = pgTable("clients", {
   id:     uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
 
   name:    text("name").notNull(),
   email:   text("email"),
@@ -88,7 +137,7 @@ export const clients = pgTable("clients", {
 // ─────────────────────────────────────────────
 export const jobs = pgTable("jobs", {
   id:       uuid("id").primaryKey().defaultRandom(),
-  userId:   uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId:   text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
 
   status:      jobStatusEnum("status").default("draft").notNull(),

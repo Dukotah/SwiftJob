@@ -1,6 +1,5 @@
 // Screen 1 — Home / Today's Board
-// Shows the tradesperson's jobs for today and this week's earnings.
-// TODO: Replace mock data with real DB queries once auth is set up.
+import { auth } from "@/auth";
 
 import Link from "next/link";
 import { centsToDisplay, formatRelativeDate } from "@/lib/utils";
@@ -37,7 +36,10 @@ const STATUS_LABELS = {
   paid:     "Paid ✓",
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth();
+  const firstName = session?.user?.name?.split(" ")[0] ?? "there";
+
   const weeklyTotal = MOCK_JOBS
     .filter((j) => j.status === "paid")
     .reduce((sum, j) => sum + j.totalAmountCents, 0);
@@ -47,7 +49,7 @@ export default function HomePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">SwiftJobs</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Hey, {firstName} 👋</h1>
           <p className="text-sm text-gray-500">
             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </p>
