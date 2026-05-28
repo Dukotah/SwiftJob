@@ -1,4 +1,5 @@
 # SwiftJobs
+<!-- trigger deploy: clients page -->
 
 Mobile-first invoicing and SEO tool for solo tradespeople.
 
