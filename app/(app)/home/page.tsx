@@ -15,6 +15,7 @@ import {
   AlertCircle,
   DollarSign,
   ChevronRight,
+  BarChart2,
 } from "lucide-react";
 
 // ── Activity feed helpers ────────────────────────────────────────────────────
@@ -171,8 +172,34 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {/* ── New Job quick action ───────────────────────── */}
-        <Link href="/job/new">
+        {/* ── Quick actions row ─────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/job/new">
+            <div className="card p-4 flex items-center gap-3 active:bg-gray-50 transition-colors h-full">
+              <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+                <DollarSign size={16} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">New Job</p>
+                <p className="text-xs text-gray-400">Photo → Invoice</p>
+              </div>
+            </div>
+          </Link>
+          <Link href="/analytics">
+            <div className="card p-4 flex items-center gap-3 active:bg-gray-50 transition-colors h-full">
+              <div className="w-9 h-9 bg-purple-50 rounded-xl flex items-center justify-center shrink-0">
+                <BarChart2 size={16} className="text-purple-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Analytics</p>
+                <p className="text-xs text-gray-400">Revenue trends</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        {/* ── (hidden — replaced by grid above) ────────────── */}
+        {false && <Link href="/job/new">
           <div className="card p-4 flex items-center justify-between active:bg-gray-50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">

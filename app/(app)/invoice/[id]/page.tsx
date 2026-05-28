@@ -112,6 +112,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           amountDisplay={centsToDisplay(job.totalAmountCents)}
           paymentUrl={job.invoice?.stripePaymentLinkUrl ?? null}
           isPaid={job.status === "paid"}
+          sentVia={job.invoice?.sentVia ?? null}
+          sentAt={job.invoice?.sentAt ?? null}
         />
 
       </div>

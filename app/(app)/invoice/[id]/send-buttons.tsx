@@ -18,9 +18,11 @@ interface Props {
   amountDisplay: string;
   paymentUrl: string | null;
   isPaid: boolean;
+  sentVia?: string | null;
+  sentAt?: Date | null;
 }
 
-export default function InvoiceSendButtons({ jobId, clientName, clientPhone, clientEmail, amountDisplay, paymentUrl, isPaid }: Props) {
+export default function InvoiceSendButtons({ jobId, clientName, clientPhone, clientEmail, amountDisplay, paymentUrl, isPaid, sentVia, sentAt }: Props) {
   const [smsSent,    setSmsSent]    = useState<SendStatus>("idle");
   const [emailSent,  setEmailSent]  = useState<SendStatus>("idle");
   const [linkCopied, setLinkCopied] = useState(false);
@@ -87,9 +89,29 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
     );
   }
 
+  // Sent history banner
+  const sentBanner = sentVia && sentAt ? (
+    <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2.5">
+      <span className="text-sm">
+        {sentVia === "sms" ? "📱" : sentVia === "email" ? "✉️" : sentVia === "cash" ? "💵" : "🔗"}
+      </span>
+      <p className="text-xs text-blue-700 font-medium flex-1">
+        {sentVia === "cash"
+          ? `Marked as cash paid`
+          : `Last sent via ${sentVia === "sms" ? "SMS" : sentVia === "email" ? "email" : "link"}`}
+        {" · "}
+        {new Date(sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+      </p>
+      <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wide">Resend?</span>
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-3">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">Send Invoice</p>
+      {sentBanner}
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
+        {sentVia ? "Send Again" : "Send Invoice"}
+      </p>
 
       <div className="card overflow-hidden divide-y divide-gray-100">
         {/* SMS */}

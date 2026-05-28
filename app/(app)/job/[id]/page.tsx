@@ -101,10 +101,69 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </Link>
       )}
 
+      {/* ── Job Timeline ─────────────────────────────────── */}
+      <div className="mt-2">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-3">History</p>
+        <div className="relative pl-6 space-y-0">
+          {/* Vertical line */}
+          <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gray-100" />
+
+          {/* Created */}
+          <TimelineEvent
+            dot="bg-gray-300"
+            label="Job created"
+            date={formatDate(job.createdAt)}
+          />
+
+          {/* Invoice sent */}
+          {job.invoice?.sentAt && (
+            <TimelineEvent
+              dot="bg-amber-400"
+              label={`Invoice sent via ${
+                job.invoice.sentVia === "sms"   ? "SMS"   :
+                job.invoice.sentVia === "email" ? "email" :
+                job.invoice.sentVia === "cash"  ? "cash"  : "link"
+              }`}
+              date={formatDate(job.invoice.sentAt)}
+            />
+          )}
+
+          {/* Paid */}
+          {job.paidAt && (
+            <TimelineEvent
+              dot="bg-emerald-500"
+              label="Payment received 💰"
+              date={formatDate(job.paidAt)}
+              highlight
+            />
+          )}
+        </div>
+      </div>
+
       {/* Delete — draft jobs only */}
       {canDelete && (
-        <DeleteJobButton jobId={job.id} />
+        <div className="mt-2">
+          <DeleteJobButton jobId={job.id} />
+        </div>
       )}
+    </div>
+  );
+}
+
+function TimelineEvent({
+  dot, label, date, highlight = false,
+}: {
+  dot: string; label: string; date: string; highlight?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3 pb-4 relative">
+      <div className={`w-[18px] h-[18px] rounded-full border-2 border-white shadow-sm shrink-0 ${dot}`} />
+      <div className="flex-1 min-w-0 -mt-0.5">
+        <p className={`text-sm font-medium ${highlight ? "text-emerald-700" : "text-gray-700"}`}>
+          {label}
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5">{date}</p>
+      </div>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { clients } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { centsToDisplay, formatRelativeDate } from "@/lib/utils";
 import { Phone, Mail, Briefcase, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 export default async function ClientsPage() {
   const session = await auth();
@@ -78,7 +79,8 @@ export default async function ClientsPage() {
           </div>
         ) : (
           clientsWithStats.map((client) => (
-            <div key={client.id} className="card p-4">
+            <Link key={client.id} href={`/clients/${client.id}`}>
+            <div className="card p-4 active:bg-gray-50 transition-colors">
 
               {/* Top row — name + total */}
               <div className="flex items-start justify-between gap-3">
@@ -134,8 +136,10 @@ export default async function ClientsPage() {
                     Last job {formatRelativeDate(client.lastJobDate)}
                   </span>
                 )}
+                <ChevronRight size={14} className="text-gray-300 ml-auto shrink-0" />
               </div>
             </div>
+            </Link>
           ))
         )}
       </div>
