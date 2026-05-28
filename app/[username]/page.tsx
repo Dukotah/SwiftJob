@@ -12,13 +12,14 @@ import { centsToDisplay } from "@/lib/utils";
 import type { Metadata } from "next";
 
 interface Props {
-  params: { username: string };
+    params: Promise<{ username: string }>;
 }
 
 // Generate SEO metadata dynamically based on the tradesperson's profile
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+    const { username } = await params;
   const user = await db.query.users.findFirst({
-    where: eq(users.username, params.username),
+        where: eq(users.username, username),
   });
   if (!user) return { title: "Not Found" };
 
@@ -37,8 +38,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function GalleryPage({ params }: Props) {
+    const { username } = await params;
   const user = await db.query.users.findFirst({
-    where: eq(users.username, params.username),
+        where: eq(users.username, username),
   });
 
   if (!user || !user.galleryEnabled) notFound();
