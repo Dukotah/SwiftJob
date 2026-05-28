@@ -27,7 +27,9 @@
     "zod": "^3.23.0",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.2",
-    "lucide-react": "^0.454.0"
+    "lucide-react": "^0.454.0",
+    "@react-email/components": "^0.0.32",
+    "@react-email/render": "^1.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
