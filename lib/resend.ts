@@ -1,37 +1,42 @@
 import { Resend } from "resend";
+import { render } from "@react-email/render";
+import InvoiceEmail from "@/emails/InvoiceEmail";
 
-/**
- * Sends an invoice email to a client.
- * For now this sends a plain-text email — we'll add HTML templates later.
- */
+interface Photo {
+  storageUrl: string;
+  type: "before" | "after" | "detail";
+}
+
 export async function sendInvoiceEmail({
   to,
   fromName,
   fromEmail,
+  clientName,
   amount,
   description,
   paymentUrl,
   jobId,
+  photos = [],
 }: {
   to: string;
   fromName: string;
   fromEmail: string;
+  clientName?: string;
   amount: string;
   description: string;
   paymentUrl: string;
   jobId: string;
+  photos?: Photo[];
 }) {
-    const resend = new Resend(process.env.RESEND_API_KEY!);
-  const { data, error } = await resend.emails.send({
-    from: `${fromName} <${process.env.RESEND_FROM_EMAIL}>`,
-    replyTo: fromEmail,
-    to,
-    subject: `Invoice from ${fromName} — ${amount} due`,
-    // TODO: Replace with a proper HTML email template (React Email works great with Resend)
-    text: `Hi there,
+  const resend = new Resend(process.env.RESEND_API_KEY!);
 
-${fromName} sent you an invoice for the following service:
+  const html = await render(
+    InvoiceEmail({ fromName, clientName, description, amount, paymentUrl, jobId, photos })
+  );
 
+  const text = `Hi ${clientName ?? "there"},
+
+${fromName} sent you an invoice for:
 ${description}
 
 Amount due: ${amount}
@@ -42,8 +47,16 @@ Thank you!
 — ${fromName}
 
 ---
-Invoice ID: ${jobId}
-Powered by SwiftJobs`,
+Invoice #${jobId.slice(0, 8).toUpperCase()}
+Powered by SwiftJobs`;
+
+  const { data, error } = await resend.emails.send({
+    from: `${fromName} <${process.env.RESEND_FROM_EMAIL}>`,
+    replyTo: fromEmail,
+    to,
+    subject: `Invoice from ${fromName} — ${amount} due`,
+    html,
+    text,
   });
 
   if (error) {

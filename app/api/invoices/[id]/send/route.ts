@@ -28,7 +28,7 @@ export async function POST(
   // Fetch the job (verify it belongs to this user)
   const job = await db.query.jobs.findFirst({
     where: and(eq(jobs.id, jobId), eq(jobs.userId, session.user.id)),
-    with: { client: true, invoice: true },
+    with: { client: true, invoice: true, photos: true },
   });
 
   if (!job) {
@@ -67,10 +67,15 @@ export async function POST(
         to:          job.client.email,
         fromName,
         fromEmail:   user?.email ?? process.env.RESEND_FROM_EMAIL!,
+        clientName:  job.client.name ?? undefined,
         amount,
         description,
         paymentUrl,
         jobId,
+        photos:      (job.photos ?? []).map((p) => ({
+          storageUrl: p.storageUrl,
+          type: p.type as "before" | "after" | "detail",
+        })),
       });
     }
 
