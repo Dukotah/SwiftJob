@@ -85,6 +85,22 @@ export default function LoginPage() {
           <p className="text-xs text-center text-gray-400 pt-2">
             No password needed. We&apos;ll email you a one-tap sign-in link.
           </p>
+
+          {process.env.NEXT_PUBLIC_DEV_BYPASS_ENABLED === "true" && (
+            <>
+              <div className="flex items-center gap-3 pt-2">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400 font-medium">dev only</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+              <a
+                href="/api/dev-auth"
+                className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white rounded-2xl py-4 font-bold text-base active:bg-gray-800 min-h-[56px]"
+              >
+                🛠 Developer Access
+              </a>
+            </>
+          )}
         </div>
       )}
     </div>
