@@ -11,8 +11,9 @@ import { ExternalLink, CreditCard, Globe, Star, CheckCircle, ChevronRight, Alert
 export default async function ProfilePage({
   searchParams,
 }: {
-  searchParams: { stripe?: string };
+    searchParams: Promise<{ stripe?: string }>;
 }) {
+    const { stripe: stripeStatus } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -22,7 +23,7 @@ export default async function ProfilePage({
 
   if (!user) redirect("/login");
 
-  const stripeStatus = searchParams.stripe;
+  
   const galleryUrl   = `${process.env.NEXT_PUBLIC_APP_URL}/${user.username ?? user.id}`;
 
   return (
