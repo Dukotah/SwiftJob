@@ -219,6 +219,37 @@ export async function deleteJob(jobId: string): Promise<ActionResult> {
   return { success: true };
 }
 
+// ── Save Profile ─────────────────────────────────────────────────────────────
+// Lets the tradesperson update their business info after onboarding.
+export async function saveProfile(formData: FormData): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+
+  const businessName = (formData.get("businessName") as string)?.trim();
+  const tradeType    =  formData.get("tradeType")    as string;
+  const city         = (formData.get("city")  as string)?.trim();
+  const state        = (formData.get("state") as string)?.trim().toUpperCase().slice(0, 2);
+  const phone        = (formData.get("phone") as string)?.trim();
+
+  if (!businessName) return { success: false, error: "Business name is required" };
+  if (!tradeType)    return { success: false, error: "Trade type is required" };
+
+  await db
+    .update(users)
+    .set({
+      businessName,
+      tradeType,
+      city:      city  || null,
+      state:     state || null,
+      phone:     phone || null,
+      username:  slugify(businessName),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, session.user.id));
+
+  return { success: true };
+}
+
 // ── Mark Job as Cash Paid ─────────────────────────────────────────────────────
 export async function markJobCashPaid(jobId: string) {
   const session = await auth();

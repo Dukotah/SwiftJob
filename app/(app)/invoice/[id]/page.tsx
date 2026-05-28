@@ -31,7 +31,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       {/* ── Header ─────────────────────────────────────── */}
       <div className="bg-white px-4 pt-12 pb-4 border-b border-gray-100 flex items-center gap-3">
-        <Link href="/home" className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center active:bg-gray-200">
+        <Link href={`/job/${job.id}`} className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center active:bg-gray-200">
           <ArrowLeft size={18} className="text-gray-600" />
         </Link>
         <div>

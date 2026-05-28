@@ -6,7 +6,8 @@ import { auth, signOut } from "@/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { ExternalLink, CreditCard, Globe, Star, CheckCircle, ChevronRight, AlertCircle, Building2 } from "lucide-react";
+import { ExternalLink, CreditCard, Globe, Star, CheckCircle, ChevronRight, AlertCircle, Building2, Pencil } from "lucide-react";
+import Link from "next/link";
 
 export default async function ProfilePage({
   searchParams,
@@ -44,9 +45,16 @@ export default async function ProfilePage({
             </h1>
             <p className="text-sm text-gray-400 truncate">{user.email}</p>
             {user.tradeType && (
-              <p className="text-xs text-blue-600 font-semibold mt-0.5 capitalize">{user.tradeType}</p>
+              <p className="text-xs text-blue-600 font-semibold mt-0.5 capitalize">{user.tradeType.replace(/_/g, " ")}</p>
             )}
           </div>
+          <Link
+            href="/profile/edit"
+            className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center active:bg-gray-200 shrink-0"
+            aria-label="Edit profile"
+          >
+            <Pencil size={15} className="text-gray-500" />
+          </Link>
         </div>
       </div>
 

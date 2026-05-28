@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare, Mail, Link2, Banknote, Check, ChevronRight, AlertCircle } from "lucide-react";
+import { MessageSquare, Mail, Link2, Share2, Banknote, Check, ChevronRight, AlertCircle } from "lucide-react";
 import { markJobCashPaid } from "@/lib/actions";
 
 function isNextInternalError(err: unknown): boolean {
@@ -59,7 +59,20 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
     }
   }
 
-  async function copyLink() {
+  async function shareOrCopyLink() {
+    // Use the native share sheet on mobile if available
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: "Your invoice is ready",
+          text:  `Invoice for ${amountDisplay} — tap to pay securely`,
+          url:   shareUrl,
+        });
+        return;
+      } catch {
+        // User cancelled or share failed — fall through to clipboard
+      }
+    }
     await navigator.clipboard.writeText(shareUrl);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2500);
@@ -146,16 +159,16 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
           onClick={() => send("email")}
         />
 
-        {/* Copy link */}
+        {/* Share / Copy link */}
         <ActionRow
-          icon={linkCopied ? <Check size={18} className="text-purple-600" /> : <Link2 size={18} className="text-purple-600" />}
+          icon={linkCopied ? <Check size={18} className="text-purple-600" /> : <Share2 size={18} className="text-purple-600" />}
           iconBg="bg-purple-50"
-          title={linkCopied ? "Copied to clipboard!" : "Copy payment link"}
-          subtitle="Paste into iMessage, WhatsApp, anywhere"
+          title={linkCopied ? "Copied!" : "Share payment link"}
+          subtitle="iMessage, WhatsApp, email, anywhere"
           disabled={false}
           loading={false}
-          done={false}
-          onClick={copyLink}
+          done={linkCopied}
+          onClick={shareOrCopyLink}
         />
       </div>
 

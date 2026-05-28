@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Camera, DollarSign, User, Phone, Mail, ArrowLeft, Loader2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Camera, DollarSign, User, Phone, Mail, ArrowLeft, Loader2, ChevronRight } from "lucide-react";
 import { createJob } from "@/lib/actions";
 import { useUploadThing } from "@/lib/uploadthing-react";
 import Link from "next/link";
@@ -10,16 +10,25 @@ function isNextInternalError(err: unknown): boolean {
   return typeof err === "object" && err !== null && "digest" in err;
 }
 
+interface ExistingClient {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+}
+
 interface NewJobFormProps {
   defaultClientName?: string;
   defaultClientPhone?: string;
   defaultClientEmail?: string;
+  existingClients?: ExistingClient[];
 }
 
 export function NewJobForm({
   defaultClientName  = "",
   defaultClientPhone = "",
   defaultClientEmail = "",
+  existingClients    = [],
 }: NewJobFormProps) {
   const [beforePreview,   setBeforePreview]   = useState<string | null>(null);
   const [afterPreview,    setAfterPreview]     = useState<string | null>(null);
@@ -30,12 +39,43 @@ export function NewJobForm({
   const [submitting,      setSubmitting]       = useState(false);
   const [error,           setError]            = useState<string | null>(null);
 
-  // Controlled client fields so defaults from URL params take effect
-  const [clientName,  setClientName]  = useState(defaultClientName);
-  const [clientPhone, setClientPhone] = useState(defaultClientPhone);
-  const [clientEmail, setClientEmail] = useState(defaultClientEmail);
+  const [clientName,       setClientName]       = useState(defaultClientName);
+  const [clientPhone,      setClientPhone]      = useState(defaultClientPhone);
+  const [clientEmail,      setClientEmail]      = useState(defaultClientEmail);
+  const [showSuggestions,  setShowSuggestions]  = useState(false);
+
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { startUpload } = useUploadThing("jobPhoto");
+
+  // Filter existing clients by name as the user types
+  const suggestions = clientName.trim().length > 0
+    ? existingClients
+        .filter((c) => c.name.toLowerCase().includes(clientName.toLowerCase()))
+        .slice(0, 5)
+    : [];
+
+  function selectClient(client: ExistingClient) {
+    setClientName(client.name);
+    setClientPhone(client.phone ?? "");
+    setClientEmail(client.email ?? "");
+    setShowSuggestions(false);
+  }
+
+  function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setClientName(e.target.value);
+    setShowSuggestions(true);
+  }
+
+  function handleNameFocus() {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    setShowSuggestions(true);
+  }
+
+  function handleNameBlur() {
+    // Delay hiding so a tap on a suggestion registers first
+    blurTimer.current = setTimeout(() => setShowSuggestions(false), 150);
+  }
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>, type: "before" | "after") {
     const file = e.target.files?.[0];
@@ -79,7 +119,6 @@ export function NewJobForm({
     setSubmitting(true);
     try {
       const formData = new FormData(e.currentTarget);
-      // Override with controlled state values
       formData.set("clientName",  clientName);
       formData.set("clientPhone", clientPhone);
       formData.set("clientEmail", clientEmail);
@@ -110,6 +149,7 @@ export function NewJobForm({
       </div>
 
       <form onSubmit={handleSubmit} className="px-4 py-5 space-y-5">
+
         {/* Photos */}
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Photos</p>
@@ -141,16 +181,54 @@ export function NewJobForm({
           </div>
         </div>
 
-        {/* Client */}
+        {/* Client — with autocomplete */}
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Client</p>
           <div className="card p-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <User size={16} className="text-gray-400 shrink-0" />
-              <input type="text" value={clientName} onChange={e => setClientName(e.target.value)}
-                placeholder="Full name" required className="field-input border-0 p-0 focus:ring-0 text-sm flex-1" />
+
+            {/* Name field + autocomplete dropdown */}
+            <div className="relative">
+              <div className="flex items-center gap-3">
+                <User size={16} className="text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  value={clientName}
+                  onChange={handleNameChange}
+                  onFocus={handleNameFocus}
+                  onBlur={handleNameBlur}
+                  placeholder="Client name"
+                  required
+                  autoComplete="off"
+                  className="field-input border-0 p-0 focus:ring-0 text-sm flex-1"
+                />
+              </div>
+
+              {/* Autocomplete dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden">
+                  {suggestions.map((client) => (
+                    <button
+                      key={client.id}
+                      type="button"
+                      onMouseDown={() => selectClient(client)}
+                      onTouchStart={() => selectClient(client)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left active:bg-blue-50 border-b border-gray-50 last:border-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{client.name}</p>
+                        {client.phone && (
+                          <p className="text-xs text-gray-400 mt-0.5">{client.phone}</p>
+                        )}
+                      </div>
+                      <ChevronRight size={14} className="text-gray-300 shrink-0 ml-2" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+
             <div className="h-px bg-gray-100" />
+
             <div className="flex items-center gap-3">
               <Phone size={16} className="text-gray-400 shrink-0" />
               <input type="tel" value={clientPhone} onChange={e => setClientPhone(e.target.value)}
@@ -176,7 +254,11 @@ export function NewJobForm({
             <span className="flex items-center justify-center gap-2">
               <Loader2 size={16} className="animate-spin" /> Uploading photos...
             </span>
-          ) : submitting ? "Creating invoice..." : "Generate Invoice →"}
+          ) : submitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 size={16} className="animate-spin" /> Creating invoice...
+            </span>
+          ) : "Generate Invoice →"}
         </button>
       </form>
     </div>
