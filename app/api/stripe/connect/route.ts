@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 // GET /api/stripe/connect
 // Starts the Stripe Express onboarding flow for a tradesperson.
 // Creates a Stripe account for them (if they don't have one) and
