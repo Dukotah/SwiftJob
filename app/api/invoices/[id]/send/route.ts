@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 // POST /api/invoices/[id]/send
 // Called by the send buttons on the invoice page.
 // Sends the invoice via SMS or email and updates the invoice record.
+// If the job has no Stripe payment link yet but the user has Stripe connected,
+// one is created on the fly so the client's pay page shows a real Pay button.
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
@@ -11,6 +13,7 @@ import { jobs, invoices, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { sendInvoiceSms } from "@/lib/twilio";
 import { sendInvoiceEmail } from "@/lib/resend";
+import { createPaymentLink } from "@/lib/stripe";
 import { centsToDisplay } from "@/lib/utils";
 
 export async function POST(
@@ -23,9 +26,8 @@ export async function POST(
   }
 
   const { method } = await req.json() as { method: "sms" | "email" };
-    const { id: jobId } = await params;
+  const { id: jobId } = await params;
 
-  // Fetch the job (verify it belongs to this user)
   const job = await db.query.jobs.findFirst({
     where: and(eq(jobs.id, jobId), eq(jobs.userId, session.user.id)),
     with: { client: true, invoice: true, photos: true },
@@ -35,17 +37,35 @@ export async function POST(
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
-  // Fetch the tradesperson's details for the message
   const user = await db.query.users.findFirst({
     where: eq(users.id, session.user.id),
   });
 
-  const fromName    = user?.businessName ?? user?.name ?? "Your service provider";
-  const amount      = centsToDisplay(job.totalAmountCents);
-  // Always send the branded /pay/[id] page — it shows photos, description,
-  // and a Pay Now button that links to Stripe. Clients land on your brand first.
-  const paymentUrl  = `${process.env.NEXT_PUBLIC_APP_URL}/pay/${jobId}`;
+  const fromName   = user?.businessName ?? user?.name ?? "Your service provider";
+  const amount     = centsToDisplay(job.totalAmountCents);
+  const paymentUrl = `${process.env.NEXT_PUBLIC_APP_URL}/pay/${jobId}`;
   const description = job.description ?? "Service";
+
+  // Create a Stripe payment link on-demand if one doesn't exist yet
+  // (happens when the user created the job before connecting Stripe)
+  let stripePaymentLinkId  = job.invoice?.stripePaymentLinkId  ?? null;
+  let stripePaymentLinkUrl = job.invoice?.stripePaymentLinkUrl ?? null;
+
+  if (!stripePaymentLinkUrl && user?.stripeAccountId && user?.stripeOnboardingDone) {
+    try {
+      const link = await createPaymentLink({
+        amountCents:     job.totalAmountCents,
+        description:     job.description || "Service Invoice",
+        stripeAccountId: user.stripeAccountId,
+        jobId,
+      });
+      stripePaymentLinkId  = link.paymentLinkId;
+      stripePaymentLinkUrl = link.paymentLinkUrl;
+    } catch (err) {
+      console.error("Failed to create payment link on send:", err);
+      // Non-fatal — the pay page will still work, just without the Stripe button
+    }
+  }
 
   try {
     if (method === "sms") {
@@ -74,20 +94,27 @@ export async function POST(
         description,
         paymentUrl,
         jobId,
-        photos:      (job.photos ?? []).map((p) => ({
+        photos: (job.photos ?? []).map((p) => ({
           storageUrl: p.storageUrl,
           type: p.type as "before" | "after" | "detail",
         })),
       });
     }
 
-    // Record that the invoice was sent and update job status
+    // Upsert the invoice record — include stripe link fields if we just created them
+    const invoiceData = {
+      sentVia: method,
+      sentAt:  new Date(),
+      ...(stripePaymentLinkId  ? { stripePaymentLinkId }  : {}),
+      ...(stripePaymentLinkUrl ? { stripePaymentLinkUrl } : {}),
+    };
+
     await db
       .insert(invoices)
-      .values({ jobId, sentVia: method, sentAt: new Date() })
+      .values({ jobId, ...invoiceData })
       .onConflictDoUpdate({
         target: invoices.jobId,
-        set:    { sentVia: method, sentAt: new Date() },
+        set:    invoiceData,
       });
 
     await db

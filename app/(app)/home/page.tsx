@@ -3,7 +3,7 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { jobs } from "@/db/schema";
+import { jobs, users } from "@/db/schema";
 import { eq, and, gte, desc } from "drizzle-orm";
 import Link from "next/link";
 import { centsToDisplay, formatRelativeDate } from "@/lib/utils";
@@ -16,6 +16,7 @@ import {
   DollarSign,
   ChevronRight,
   BarChart2,
+  CreditCard,
 } from "lucide-react";
 
 // ── Activity feed helpers ────────────────────────────────────────────────────
@@ -44,20 +45,23 @@ export default async function HomePage() {
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
-  // All jobs this month (used for weekly + monthly stats — filter in JS)
-  const monthJobs = await db.query.jobs.findMany({
-    where: and(eq(jobs.userId, userId), gte(jobs.createdAt, monthStart)),
-    with:  { client: true },
-    orderBy: [desc(jobs.updatedAt)],
-  });
-
-  // Recent activity feed — last 10 jobs across all time, by most recently updated
-  const activityJobs = await db.query.jobs.findMany({
-    where: eq(jobs.userId, userId),
-    with:  { client: true },
-    orderBy: [desc(jobs.updatedAt)],
-    limit: 10,
-  });
+  const [user, monthJobs, activityJobs] = await Promise.all([
+    db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { stripeOnboardingDone: true },
+    }),
+    db.query.jobs.findMany({
+      where: and(eq(jobs.userId, userId), gte(jobs.createdAt, monthStart)),
+      with:  { client: true },
+      orderBy: [desc(jobs.updatedAt)],
+    }),
+    db.query.jobs.findMany({
+      where: eq(jobs.userId, userId),
+      with:  { client: true },
+      orderBy: [desc(jobs.updatedAt)],
+      limit: 10,
+    }),
+  ]);
 
   // ── Aggregate stats ────────────────────────────────────────────────────────
 
@@ -69,8 +73,8 @@ export default async function HomePage() {
   const weekSent    = weekJobs.filter((j) => j.status === "invoiced").length;
   const weekDraft   = weekJobs.filter((j) => j.status === "draft")   .length;
 
-  const monthEarned  = monthJobs.filter((j) => j.status === "paid")    .reduce((s, j) => s + j.totalAmountCents, 0);
-  const unpaidCount  = monthJobs.filter((j) => j.status === "invoiced").length;
+  const monthEarned = monthJobs.filter((j) => j.status === "paid")    .reduce((s, j) => s + j.totalAmountCents, 0);
+  const unpaidCount = monthJobs.filter((j) => j.status === "invoiced").length;
 
   // Greeting
   const hour = now.getHours();
@@ -86,6 +90,22 @@ export default async function HomePage() {
       </div>
 
       <div className="px-4 py-4 space-y-3">
+
+        {/* ── Stripe connect prompt ──────────────────────── */}
+        {!user?.stripeOnboardingDone && (
+          <a href="/api/stripe/connect" className="block">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 active:bg-amber-100 transition-colors">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+                <CreditCard size={18} className="text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-amber-900 text-sm">Connect Stripe to get paid</p>
+                <p className="text-xs text-amber-600 mt-0.5">Accept card payments on every invoice →</p>
+              </div>
+              <ChevronRight size={16} className="text-amber-400 shrink-0" />
+            </div>
+          </a>
+        )}
 
         {/* ── Earnings hero card ─────────────────────────── */}
         <div className="bg-blue-600 rounded-3xl p-5 text-white shadow-lg shadow-blue-200">
@@ -198,23 +218,6 @@ export default async function HomePage() {
           </Link>
         </div>
 
-        {/* ── (hidden — replaced by grid above) ────────────── */}
-        {false && <Link href="/job/new">
-          <div className="card p-4 flex items-center justify-between active:bg-gray-50 transition-colors">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                <DollarSign size={18} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">Start a new job</p>
-                <p className="text-xs text-gray-400">Photo → Invoice → Paid</p>
-              </div>
-            </div>
-            <ChevronRight size={18} className="text-gray-300" />
-          </div>
-        </Link>
-      }
-
         {/* ── Recent activity feed ───────────────────────── */}
         <div>
           <div className="flex items-center justify-between mb-2 px-1">
@@ -241,7 +244,6 @@ export default async function HomePage() {
                 return (
                   <Link key={job.id} href={`/job/${job.id}`}>
                     <div className="card p-4 flex items-center gap-3 active:bg-gray-50 transition-colors">
-                      {/* Activity icon */}
                       <span className="text-lg w-8 text-center shrink-0">{cfg.icon}</span>
 
                       <div className="flex-1 min-w-0">

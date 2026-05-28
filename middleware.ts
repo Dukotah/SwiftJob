@@ -15,7 +15,7 @@ const ALWAYS_PUBLIC = [
 // public gallery, so it's allowed through for unauthenticated visitors.
 const APP_SEGMENTS = new Set([
   "home", "job", "invoice", "profile", "clients",
-  "jobs", "onboarding", "dev", "pay",
+  "jobs", "onboarding", "dev", "pay", "analytics",
 ]);
 
 export default auth((req) => {
