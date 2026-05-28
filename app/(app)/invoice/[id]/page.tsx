@@ -11,12 +11,13 @@ import InvoiceSendButtons from "./send-buttons";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-export default async function InvoicePage({ params }: { params: { id: string } }) {
+export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const job = await db.query.jobs.findFirst({
-    where: and(eq(jobs.id, params.id), eq(jobs.userId, session.user.id)),
+        where: and(eq(jobs.id, id), eq(jobs.userId, session.user.id)),
     with: { client: true, photos: true, invoice: true },
   });
 
