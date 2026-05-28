@@ -3,30 +3,44 @@
 @tailwind utilities;
 
 @layer base {
-  /* Prevent text size from changing when rotating to landscape on iOS */
   html {
     -webkit-text-size-adjust: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   }
 
-  /* Smooth scrolling but respect user's motion preferences */
   @media (prefers-reduced-motion: no-preference) {
-    html {
-      scroll-behavior: smooth;
-    }
+    html { scroll-behavior: smooth; }
   }
 
   body {
-    /* Prevents the "double-tap to zoom" delay on mobile */
     touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+    background-color: #f8fafc;
   }
 }
 
 @layer utilities {
-  /* Safe area insets for phones with notches / home indicators (iPhone X+) */
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+
+  /* Tabular numbers so dollar amounts don't shift width */
+  .money { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+  .card { @apply bg-white rounded-2xl border border-gray-100 shadow-sm; }
+
+  .badge-draft    { @apply bg-gray-100 text-gray-500 text-xs font-semibold px-2.5 py-1 rounded-full; }
+  .badge-invoiced { @apply bg-amber-50 text-amber-600 text-xs font-semibold px-2.5 py-1 rounded-full; }
+  .badge-paid     { @apply bg-emerald-50 text-emerald-600 text-xs font-semibold px-2.5 py-1 rounded-full; }
+
+  .btn-primary {
+    @apply bg-blue-600 text-white font-bold rounded-2xl py-4 px-6 text-base active:bg-blue-700 disabled:opacity-40 transition-colors w-full;
   }
-  .pt-safe {
-    padding-top: env(safe-area-inset-top);
+
+  .btn-ghost {
+    @apply border border-gray-200 bg-white text-gray-700 font-medium rounded-2xl py-3 px-5 text-sm active:bg-gray-50 transition-colors;
+  }
+
+  .field-input {
+    @apply w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-base;
   }
 }

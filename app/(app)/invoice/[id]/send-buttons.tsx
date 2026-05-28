@@ -1,10 +1,7 @@
 "use client";
 
-// send-buttons.tsx — the interactive send/pay buttons on the invoice page.
-// Kept as a separate client component so the parent invoice page can be a server component.
-
 import { useState } from "react";
-import { MessageSquare, Mail, Link2, Banknote, Check } from "lucide-react";
+import { MessageSquare, Mail, Link2, Banknote, Check, ChevronRight } from "lucide-react";
 import { markJobCashPaid } from "@/lib/actions";
 
 type SendStatus = "idle" | "sending" | "sent";
@@ -25,148 +22,121 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
   const [linkCopied, setLinkCopied] = useState(false);
   const [marking,    setMarking]    = useState(false);
 
-  const firstName = clientName.split(" ")[0];
+  const firstName  = clientName.split(" ")[0];
+  const shareUrl   = paymentUrl ?? (typeof window !== "undefined" ? `${window.location.origin}/pay/${jobId}` : "");
 
-  // Stripe not set up yet — show placeholder link
-  const shareUrl = paymentUrl ?? `${window.location.origin}/pay/${jobId}`;
+  async function send(method: "sms" | "email") {
+    if (method === "sms")   setSmsSent("sending");
+    if (method === "email") setEmailSent("sending");
 
-  async function handleSendSms() {
-    if (!clientPhone) return;
-    setSmsSent("sending");
     await fetch(`/api/invoices/${jobId}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method: "sms" }),
+      body: JSON.stringify({ method }),
     });
-    setSmsSent("sent");
+
+    if (method === "sms")   setSmsSent("sent");
+    if (method === "email") setEmailSent("sent");
   }
 
-  async function handleSendEmail() {
-    if (!clientEmail) return;
-    setEmailSent("sending");
-    await fetch(`/api/invoices/${jobId}/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method: "email" }),
-    });
-    setEmailSent("sent");
-  }
-
-  async function handleCopyLink() {
+  async function copyLink() {
     await navigator.clipboard.writeText(shareUrl);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2500);
   }
 
-  async function handleCashPaid() {
-    setMarking(true);
-    await markJobCashPaid(jobId);
-  }
-
   if (isPaid) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-2xl p-5 text-center">
-        <p className="text-2xl mb-1">✓</p>
-        <p className="font-bold text-green-700">Paid {amountDisplay}</p>
-        <p className="text-sm text-green-600">This job is complete.</p>
+      <div className="card p-5 text-center">
+        <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+          <Check size={24} className="text-emerald-600" />
+        </div>
+        <p className="font-bold text-gray-900">Paid — {amountDisplay}</p>
+        <p className="text-sm text-gray-400 mt-1">This job is complete</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">Send via</p>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">Send Invoice</p>
 
-      {/* SMS */}
-      {clientPhone ? (
-        <SendButton
-          icon={<MessageSquare size={22} />}
-          label={smsSent === "sent" ? "Sent!" : `Text ${firstName}`}
-          sublabel={clientPhone}
-          status={smsSent}
-          onClick={handleSendSms}
-          color="green"
+      <div className="card overflow-hidden divide-y divide-gray-100">
+        {/* SMS */}
+        <ActionRow
+          icon={<MessageSquare size={18} className="text-green-600" />}
+          iconBg="bg-green-50"
+          title={smsSent === "sent" ? "Sent!" : clientPhone ? `Text ${firstName}` : "Text client"}
+          subtitle={clientPhone ?? "No phone saved"}
+          disabled={!clientPhone || smsSent !== "idle"}
+          loading={smsSent === "sending"}
+          done={smsSent === "sent"}
+          onClick={() => send("sms")}
         />
-      ) : (
-        <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 opacity-50">
-          <MessageSquare size={22} className="text-gray-400" />
-          <div>
-            <p className="font-semibold text-gray-500 text-sm">Text client</p>
-            <p className="text-xs text-gray-400">No phone number saved</p>
-          </div>
-        </div>
-      )}
 
-      {/* Email */}
-      {clientEmail ? (
-        <SendButton
-          icon={<Mail size={22} />}
-          label={emailSent === "sent" ? "Sent!" : `Email ${firstName}`}
-          sublabel={clientEmail}
-          status={emailSent}
-          onClick={handleSendEmail}
-          color="blue"
+        {/* Email */}
+        <ActionRow
+          icon={<Mail size={18} className="text-blue-600" />}
+          iconBg="bg-blue-50"
+          title={emailSent === "sent" ? "Sent!" : clientEmail ? `Email ${firstName}` : "Email client"}
+          subtitle={clientEmail ?? "No email saved"}
+          disabled={!clientEmail || emailSent !== "idle"}
+          loading={emailSent === "sending"}
+          done={emailSent === "sent"}
+          onClick={() => send("email")}
         />
-      ) : (
-        <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 opacity-50">
-          <Mail size={22} className="text-gray-400" />
-          <div>
-            <p className="font-semibold text-gray-500 text-sm">Email client</p>
-            <p className="text-xs text-gray-400">No email saved</p>
-          </div>
-        </div>
-      )}
 
-      {/* Copy link */}
-      <button
-        onClick={handleCopyLink}
-        className="w-full flex items-center gap-4 bg-white border border-gray-200 rounded-2xl px-4 py-3 text-left active:bg-gray-50"
-      >
-        <div className="text-purple-500">
-          {linkCopied ? <Check size={22} /> : <Link2 size={22} />}
-        </div>
-        <div>
-          <p className="font-semibold text-gray-900 text-sm">{linkCopied ? "Copied!" : "Copy Payment Link"}</p>
-          <p className="text-xs text-gray-400">Paste anywhere — iMessage, WhatsApp, etc.</p>
-        </div>
-      </button>
+        {/* Copy link */}
+        <ActionRow
+          icon={linkCopied ? <Check size={18} className="text-purple-600" /> : <Link2 size={18} className="text-purple-600" />}
+          iconBg="bg-purple-50"
+          title={linkCopied ? "Copied to clipboard!" : "Copy payment link"}
+          subtitle="Paste into iMessage, WhatsApp, anywhere"
+          disabled={false}
+          loading={false}
+          done={false}
+          onClick={copyLink}
+        />
+      </div>
 
       {/* Cash */}
       <button
-        onClick={handleCashPaid}
+        onClick={async () => { setMarking(true); await markJobCashPaid(jobId); }}
         disabled={marking}
-        className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-2xl py-3 text-gray-600 font-medium text-sm active:bg-gray-50 disabled:opacity-50"
+        className="btn-ghost w-full flex items-center justify-center gap-2"
       >
-        <Banknote size={18} />
+        <Banknote size={16} className="text-gray-500" />
         {marking ? "Marking..." : "Mark as Cash Paid"}
       </button>
     </div>
   );
 }
 
-function SendButton({ icon, label, sublabel, status, onClick, color }: {
+function ActionRow({ icon, iconBg, title, subtitle, disabled, loading, done, onClick }: {
   icon: React.ReactNode;
-  label: string;
-  sublabel: string;
-  status: SendStatus;
+  iconBg: string;
+  title: string;
+  subtitle: string;
+  disabled: boolean;
+  loading: boolean;
+  done: boolean;
   onClick: () => void;
-  color: "green" | "blue";
 }) {
   return (
     <button
       onClick={onClick}
-      disabled={status !== "idle"}
-      className="w-full flex items-center gap-4 bg-white border border-gray-200 rounded-2xl px-4 py-3 text-left active:bg-gray-50 disabled:opacity-60"
+      disabled={disabled}
+      className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50 disabled:opacity-50 transition-colors"
     >
-      <div className={color === "green" ? "text-green-600" : "text-blue-600"}>
-        {status === "sent" ? <Check size={22} /> : icon}
+      <div className={`w-9 h-9 ${iconBg} rounded-xl flex items-center justify-center shrink-0`}>
+        {icon}
       </div>
-      <div>
-        <p className="font-semibold text-gray-900 text-sm">
-          {status === "sending" ? "Sending..." : label}
-        </p>
-        <p className="text-xs text-gray-400">{sublabel}</p>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-gray-900 text-sm">{loading ? "Sending..." : title}</p>
+        <p className="text-xs text-gray-400 truncate">{subtitle}</p>
       </div>
+      {!done && !loading && <ChevronRight size={16} className="text-gray-300 shrink-0" />}
+      {done && <Check size={16} className="text-emerald-500 shrink-0" />}
     </button>
   );
 }
