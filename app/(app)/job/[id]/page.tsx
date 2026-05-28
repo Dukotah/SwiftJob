@@ -9,13 +9,14 @@ import { eq, and } from "drizzle-orm";
 import Link from "next/link";
 import { centsToDisplay, formatDate } from "@/lib/utils";
 
-export default async function JobDetailPage({ params }: { params: { id: string } }) {
+export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   // Fetch the job, making sure it belongs to the logged-in user
   const job = await db.query.jobs.findFirst({
-    where: and(eq(jobs.id, params.id), eq(jobs.userId, session.user.id)),
+        where: and(eq(jobs.id, id), eq(jobs.userId, session.user.id)),
     with: {
       client: true,
       photos: true,
