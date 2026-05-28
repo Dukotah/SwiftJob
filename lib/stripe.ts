@@ -2,9 +2,14 @@ import Stripe from "stripe";
 
 // Stripe client — used server-side only (never import this in a client component)
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2025-02-24.acacia",
+  apiVersion: "2025-02-24.acacia",
   typescript: true,
 });
+
+// Platform fee: SwiftJobs takes 2% of every transaction.
+// Example: $180 job → $3.60 platform fee, tradesperson receives ~$176.40 (minus Stripe's own fees)
+// Adjust this number to change your revenue model.
+const PLATFORM_FEE_PERCENT = 0.02;
 
 /**
  * Creates a Stripe Payment Link for a job.
@@ -45,16 +50,20 @@ export async function createPaymentLink({
     { stripeAccount: stripeAccountId }
   );
 
+  // Calculate platform fee in cents
+  const platformFeeCents = Math.round(amountCents * PLATFORM_FEE_PERCENT);
+
   // Create the payment link
+  // application_fee_amount: SwiftJobs collects this fee from each payment
   const paymentLink = await stripe.paymentLinks.create(
     {
       line_items: [{ price: price.id, quantity: 1 }],
       metadata: { jobId },
-      // After paying, client sees a success message
+      application_fee_amount: platformFeeCents,
       after_completion: {
         type: "hosted_confirmation",
         hosted_confirmation: {
-          custom_message: "Thank you for your payment!",
+          custom_message: "Payment received! Thank you.",
         },
       },
     },

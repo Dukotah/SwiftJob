@@ -8,8 +8,9 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { jobs, clients, invoices } from "@/db/schema";
+import { jobs, clients, invoices, users } from "@/db/schema";
 import { dollarsToCents } from "@/lib/utils";
+import { createPaymentLink } from "@/lib/stripe";
 import { eq, and } from "drizzle-orm";
 
 // ── Create Job ────────────────────────────────────────────────────────────────
@@ -61,6 +62,8 @@ export async function createJob(formData: FormData) {
     clientId = newClient.id;
   }
 
+  const totalAmountCents = dollarsToCents(totalStr);
+
   // Create the job record
   const [job] = await db
     .insert(jobs)
@@ -68,10 +71,42 @@ export async function createJob(formData: FormData) {
       userId,
       clientId,
       description: description || null,
-      totalAmountCents: dollarsToCents(totalStr),
+      totalAmountCents,
       status: "draft",
     })
     .returning({ id: jobs.id });
+
+  // If the tradesperson has Stripe connected, generate a payment link immediately
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+
+  if (user?.stripeAccountId && user?.stripeOnboardingDone) {
+    try {
+      const { paymentLinkId, paymentLinkUrl } = await createPaymentLink({
+        amountCents:     totalAmountCents,
+        description:     description || "Service Invoice",
+        stripeAccountId: user.stripeAccountId,
+        jobId:           job.id,
+      });
+
+      // Save the payment link to the invoices table
+      await db.insert(invoices).values({
+        jobId:                job.id,
+        stripePaymentLinkId:  paymentLinkId,
+        stripePaymentLinkUrl: paymentLinkUrl,
+      });
+
+      // Move job from draft → invoiced
+      await db
+        .update(jobs)
+        .set({ status: "invoiced", updatedAt: new Date() })
+        .where(eq(jobs.id, job.id));
+    } catch (err) {
+      // Don't block the user if Stripe fails — they can still send manually
+      console.error("Stripe payment link creation failed:", err);
+    }
+  }
 
   // Redirect to the invoice page for this job
   redirect(`/invoice/${job.id}`);
