@@ -101,6 +101,22 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </Link>
       )}
 
+      {/* Repeat job — pre-fills new job form with same client */}
+      {job.client && (() => {
+        const params = new URLSearchParams();
+        if (job.client.name)  params.set("clientName",  job.client.name);
+        if (job.client.phone) params.set("clientPhone", job.client.phone);
+        if (job.client.email) params.set("clientEmail", job.client.email);
+        return (
+          <Link
+            href={`/job/new?${params.toString()}`}
+            className="block w-full border border-gray-200 bg-white text-gray-600 py-3.5 rounded-2xl font-semibold text-center text-sm active:bg-gray-50 mb-3"
+          >
+            Repeat for {job.client.name.split(" ")[0]} →
+          </Link>
+        );
+      })()}
+
       {/* ── Job Timeline ─────────────────────────────────── */}
       <div className="mt-2">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-3">History</p>

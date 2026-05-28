@@ -110,15 +110,22 @@ export async function createJob(formData: FormData) {
     }
   }
 
-  // Save any photo URLs that were uploaded client-side via Uploadthing
-  // The form sends beforePhotoUrl and afterPhotoUrl as hidden fields
+  // Save photo URLs uploaded client-side via Uploadthing
   const beforeUrl = formData.get("beforePhotoUrl") as string | null;
   const afterUrl  = formData.get("afterPhotoUrl")  as string | null;
 
-  const photoInserts = [
+  type PhotoInsert = { jobId: string; storageUrl: string; type: "before" | "after" | "detail" };
+
+  const photoInserts: PhotoInsert[] = [
     beforeUrl && { jobId: job.id, storageUrl: beforeUrl, type: "before" as const },
     afterUrl  && { jobId: job.id, storageUrl: afterUrl,  type: "after"  as const },
-  ].filter(Boolean) as { jobId: string; storageUrl: string; type: "before" | "after" }[];
+  ].filter(Boolean) as PhotoInsert[];
+
+  // Detail photos — form sends detailPhotoUrl_0, detailPhotoUrl_1, detailPhotoUrl_2
+  for (let i = 0; i < 3; i++) {
+    const url = formData.get(`detailPhotoUrl_${i}`) as string | null;
+    if (url) photoInserts.push({ jobId: job.id, storageUrl: url, type: "detail" });
+  }
 
   if (photoInserts.length > 0) {
     await db.insert(jobPhotos).values(photoInserts);
