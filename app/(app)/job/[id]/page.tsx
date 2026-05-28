@@ -9,7 +9,7 @@ import { jobs } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import Link from "next/link";
 import { centsToDisplay, formatDate } from "@/lib/utils";
-import { Pencil } from "lucide-react";
+import { Pencil, Sparkles } from "lucide-react";
 import { DeleteJobButton } from "./delete-button";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -98,6 +98,17 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           className="block w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-center text-lg active:bg-blue-700 mb-3"
         >
           {job.status === "invoiced" ? "View Invoice →" : "Generate Invoice →"}
+        </Link>
+      )}
+
+      {/* Create Post — AI caption generator, only for jobs with photos */}
+      {job.photos.length > 0 && (
+        <Link
+          href={`/job/${job.id}/content`}
+          className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3.5 rounded-2xl font-bold text-center text-sm active:opacity-90 mb-3 shadow-sm shadow-blue-200"
+        >
+          <Sparkles size={16} />
+          Create Social Post
         </Link>
       )}
 
