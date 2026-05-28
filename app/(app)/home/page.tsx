@@ -17,6 +17,8 @@ import {
   ChevronRight,
   BarChart2,
   CreditCard,
+  Camera,
+  Plus,
 } from "lucide-react";
 
 // ── Activity feed helpers ────────────────────────────────────────────────────
@@ -230,12 +232,16 @@ export default async function HomePage() {
           </div>
 
           {activityJobs.length === 0 ? (
-            <div className="card p-10 text-center">
-              <p className="text-3xl mb-3">📋</p>
-              <p className="font-semibold text-gray-700">No jobs yet</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Tap the + button to capture your first job
-              </p>
+            <div className="card p-8 text-center">
+              <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Camera size={28} className="text-blue-400" />
+              </div>
+              <p className="font-bold text-gray-900 text-lg mb-1">No jobs yet</p>
+              <p className="text-sm text-gray-400 mb-5">Capture your first job in under 60 seconds</p>
+              <Link href="/job/new" className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm active:bg-blue-700">
+                <Plus size={16} />
+                New Job
+              </Link>
             </div>
           ) : (
             <div className="space-y-2">

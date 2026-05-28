@@ -126,6 +126,18 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
         {sentVia ? "Send Again" : "Send Invoice"}
       </p>
 
+      {paymentUrl ? (
+        <div className="flex items-center gap-2 px-1 mb-1">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <p className="text-xs text-emerald-600 font-medium">Payment link ready</p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 px-1 mb-1">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <p className="text-xs text-amber-600 font-medium">Connect Stripe to enable card payments</p>
+        </div>
+      )}
+
       <div className="card overflow-hidden divide-y divide-gray-100">
         {/* SMS */}
         <ActionRow

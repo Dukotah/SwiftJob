@@ -77,9 +77,9 @@ export default async function ProfilePage({
         {/* ── Get Paid ───────────────────────────────────── */}
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1 mb-2">Get Paid</p>
-          <div className="card overflow-hidden">
+          <div className={`overflow-hidden rounded-2xl border shadow-sm ${user.stripeOnboardingDone ? "bg-white border-gray-100" : "bg-blue-50 border-2 border-blue-200"}`}>
             <div className="flex items-center gap-4 px-4 py-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${user.stripeOnboardingDone ? "bg-emerald-50" : "bg-blue-50"}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${user.stripeOnboardingDone ? "bg-emerald-50" : "bg-blue-100"}`}>
                 <CreditCard size={20} className={user.stripeOnboardingDone ? "text-emerald-600" : "text-blue-600"} />
               </div>
               <div className="flex-1 min-w-0">
@@ -97,7 +97,7 @@ export default async function ProfilePage({
               ) : (
                 <a
                   href="/api/stripe/connect"
-                  className="shrink-0 bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-xl active:bg-blue-700 whitespace-nowrap"
+                  className="shrink-0 bg-blue-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm active:bg-blue-700 whitespace-nowrap"
                 >
                   Set Up →
                 </a>
