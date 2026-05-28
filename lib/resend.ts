@@ -1,8 +1,5 @@
 import { Resend } from "resend";
 
-// Resend client — used server-side only
-const resend = new Resend(process.env.RESEND_API_KEY!);
-
 /**
  * Sends an invoice email to a client.
  * For now this sends a plain-text email — we'll add HTML templates later.
@@ -24,6 +21,7 @@ export async function sendInvoiceEmail({
   paymentUrl: string;
   jobId: string;
 }) {
+    const resend = new Resend(process.env.RESEND_API_KEY!);
   const { data, error } = await resend.emails.send({
     from: `${fromName} <${process.env.RESEND_FROM_EMAIL}>`,
     replyTo: fromEmail,
