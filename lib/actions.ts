@@ -8,8 +8,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { jobs, clients, invoices, users } from "@/db/schema";
-import { dollarsToCents } from "@/lib/utils";
+import { jobs, clients, invoices, users, jobPhotos } from "@/db/schema";
+import { dollarsToCents, slugify } from "@/lib/utils";
 import { createPaymentLink } from "@/lib/stripe";
 import { eq, and } from "drizzle-orm";
 
@@ -108,8 +108,44 @@ export async function createJob(formData: FormData) {
     }
   }
 
+  // Save any photo URLs that were uploaded client-side via Uploadthing
+  // The form sends beforePhotoUrl and afterPhotoUrl as hidden fields
+  const beforeUrl = formData.get("beforePhotoUrl") as string | null;
+  const afterUrl  = formData.get("afterPhotoUrl")  as string | null;
+
+  const photoInserts = [
+    beforeUrl && { jobId: job.id, storageUrl: beforeUrl, type: "before" as const },
+    afterUrl  && { jobId: job.id, storageUrl: afterUrl,  type: "after"  as const },
+  ].filter(Boolean) as { jobId: string; storageUrl: string; type: "before" | "after" }[];
+
+  if (photoInserts.length > 0) {
+    await db.insert(jobPhotos).values(photoInserts);
+  }
+
   // Redirect to the invoice page for this job
   redirect(`/invoice/${job.id}`);
+}
+
+// ── Save Onboarding Info ───────────────────────────────────────────────────────
+// Called when a new user completes the onboarding form.
+export async function saveOnboarding(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const businessName = formData.get("businessName") as string;
+  const tradeType    = formData.get("tradeType")    as string;
+  const city         = formData.get("city")         as string;
+  const state        = formData.get("state")        as string;
+
+  // Auto-generate a username from their business name
+  const username = slugify(businessName);
+
+  await db
+    .update(users)
+    .set({ businessName, tradeType, city, state, username, updatedAt: new Date() })
+    .where(eq(users.id, session.user.id));
+
+  redirect("/home");
 }
 
 // ── Mark Job as Cash Paid ─────────────────────────────────────────────────────
