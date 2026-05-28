@@ -193,7 +193,9 @@ export default async function HomePage() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
               Recent Activity
             </p>
-            <p className="text-xs text-gray-400">{activityJobs.length} jobs</p>
+            <Link href="/jobs" className="text-xs text-blue-600 font-semibold">
+              View all →
+            </Link>
           </div>
 
           {activityJobs.length === 0 ? (

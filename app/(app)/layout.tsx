@@ -3,6 +3,7 @@
 import { Home, Plus, User, Users, Terminal } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ToastProvider } from "@/components/toast-provider";
 
 const SHOW_DEV = process.env.NEXT_PUBLIC_SHOW_DEV_BUTTON === "true";
 
@@ -10,6 +11,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
+    <ToastProvider>
     <div className="flex flex-col min-h-screen bg-slate-50">
       <main className="flex-1 overflow-y-auto" style={{ paddingBottom: "80px" }}>
         {children}
@@ -92,5 +94,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
     </div>
+    </ToastProvider>
   );
 }

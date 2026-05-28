@@ -13,6 +13,8 @@ import { dollarsToCents, slugify } from "@/lib/utils";
 import { createPaymentLink } from "@/lib/stripe";
 import { eq, and } from "drizzle-orm";
 
+type ActionResult = { success: boolean; error?: string };
+
 // ── Create Job ────────────────────────────────────────────────────────────────
 // Called when the tradesperson submits the Job Capture form.
 // Creates (or reuses) a client record, then creates the job.
@@ -146,6 +148,75 @@ export async function saveOnboarding(formData: FormData) {
     .where(eq(users.id, session.user.id));
 
   redirect("/home");
+}
+
+// ── Update Job ────────────────────────────────────────────────────────────────
+// Allows editing description, amount, and client info on any non-paid job.
+// Returns a result object — client component handles toast + navigation.
+export async function updateJob(formData: FormData): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+
+  const jobId       = formData.get("jobId")       as string;
+  const description = formData.get("description") as string;
+  const totalStr    = formData.get("total")        as string;
+  const clientName  = formData.get("clientName")  as string;
+  const clientPhone = formData.get("clientPhone") as string;
+  const clientEmail = formData.get("clientEmail") as string;
+
+  if (!jobId) return { success: false, error: "Job ID missing" };
+
+  const job = await db.query.jobs.findFirst({
+    where: and(eq(jobs.id, jobId), eq(jobs.userId, session.user.id)),
+    with: { client: true },
+  });
+
+  if (!job)              return { success: false, error: "Job not found" };
+  if (job.status === "paid") return { success: false, error: "Paid jobs cannot be edited" };
+
+  const totalAmountCents = dollarsToCents(totalStr);
+  if (!totalAmountCents || totalAmountCents <= 0) {
+    return { success: false, error: "Enter a valid amount" };
+  }
+
+  await db
+    .update(jobs)
+    .set({ description: description || null, totalAmountCents, updatedAt: new Date() })
+    .where(eq(jobs.id, jobId));
+
+  if (job.clientId) {
+    await db
+      .update(clients)
+      .set({
+        name:  clientName  || job.client?.name  || "Unknown",
+        phone: clientPhone || null,
+        email: clientEmail || null,
+      })
+      .where(eq(clients.id, job.clientId));
+  }
+
+  return { success: true };
+}
+
+// ── Delete Job ────────────────────────────────────────────────────────────────
+// Hard-deletes a draft job (cascade removes photos + invoice records).
+// Only draft jobs can be deleted — invoiced/paid jobs are locked.
+export async function deleteJob(jobId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Not authenticated" };
+
+  const job = await db.query.jobs.findFirst({
+    where: and(eq(jobs.id, jobId), eq(jobs.userId, session.user.id)),
+  });
+
+  if (!job) return { success: false, error: "Job not found" };
+  if (job.status !== "draft") {
+    return { success: false, error: "Only draft jobs can be deleted" };
+  }
+
+  await db.delete(jobs).where(eq(jobs.id, jobId));
+
+  return { success: true };
 }
 
 // ── Mark Job as Cash Paid ─────────────────────────────────────────────────────
