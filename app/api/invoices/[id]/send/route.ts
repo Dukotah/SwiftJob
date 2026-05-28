@@ -13,7 +13,7 @@ import { centsToDisplay } from "@/lib/utils";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -21,7 +21,7 @@ export async function POST(
   }
 
   const { method } = await req.json() as { method: "sms" | "email" };
-  const jobId = params.id;
+    const { id: jobId } = await params;
 
   // Fetch the job (verify it belongs to this user)
   const job = await db.query.jobs.findFirst({
