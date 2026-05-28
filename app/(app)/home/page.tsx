@@ -213,6 +213,7 @@ export default async function HomePage() {
             <ChevronRight size={18} className="text-gray-300" />
           </div>
         </Link>
+      }
 
         {/* ── Recent activity feed ───────────────────────── */}
         <div>
