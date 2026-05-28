@@ -1,11 +1,5 @@
 import twilio from "twilio";
 
-// Twilio client — used server-side only
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID!,
-  process.env.TWILIO_AUTH_TOKEN!
-);
-
 /**
  * Sends an invoice SMS to a client.
  * The message includes the payment link so the client can pay instantly.
@@ -28,6 +22,7 @@ export async function sendInvoiceSms({
   description: string;
   paymentUrl: string;
 }) {
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
   const message = `Hi! ${fromName} sent you an invoice for ${amount}.
 
 Service: ${description}
