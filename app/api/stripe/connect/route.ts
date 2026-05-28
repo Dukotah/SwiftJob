@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 // GET /api/stripe/connect
 // Starts the Stripe Express onboarding flow for a tradesperson.
 // Creates a Stripe account for them (if they don't have one) and
@@ -13,7 +15,7 @@ import { stripe } from "@/lib/stripe";
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.redirect("/login");
+    return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"));
   }
 
   const user = await db.query.users.findFirst({

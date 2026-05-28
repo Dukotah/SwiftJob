@@ -1,3 +1,7 @@
+// Force dynamic rendering — this route calls auth() which reads cookies
+// and cannot be statically pre-rendered at build time.
+export const dynamic = "force-dynamic";
+
 // GET /api/stripe/connect/return
 // Stripe redirects the tradesperson here after they finish onboarding.
 // We verify the account is active and mark them as fully onboarded.
@@ -11,7 +15,7 @@ import { stripe } from "@/lib/stripe";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.id) return NextResponse.redirect("/login");
+  if (!session?.user?.id) return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"));
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, session.user.id),

@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { MessageSquare, Mail, Link2, Banknote, Check, ChevronRight } from "lucide-react";
+import { MessageSquare, Mail, Link2, Banknote, Check, ChevronRight, AlertCircle } from "lucide-react";
 import { markJobCashPaid } from "@/lib/actions";
 
-type SendStatus = "idle" | "sending" | "sent";
+function isNextInternalError(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "digest" in err;
+}
+
+type SendStatus = "idle" | "sending" | "sent" | "error";
 
 interface Props {
   jobId: string;
@@ -21,28 +25,52 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
   const [emailSent,  setEmailSent]  = useState<SendStatus>("idle");
   const [linkCopied, setLinkCopied] = useState(false);
   const [marking,    setMarking]    = useState(false);
+  const [cashError,  setCashError]  = useState<string | null>(null);
 
-  const firstName  = clientName.split(" ")[0];
-  const shareUrl   = paymentUrl ?? (typeof window !== "undefined" ? `${window.location.origin}/pay/${jobId}` : "");
+  const firstName = clientName.split(" ")[0];
+  const shareUrl  = paymentUrl ?? (typeof window !== "undefined" ? `${window.location.origin}/pay/${jobId}` : "");
 
   async function send(method: "sms" | "email") {
     if (method === "sms")   setSmsSent("sending");
     if (method === "email") setEmailSent("sending");
 
-    await fetch(`/api/invoices/${jobId}/send`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method }),
-    });
+    try {
+      const res = await fetch(`/api/invoices/${jobId}/send`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ method }),
+      });
 
-    if (method === "sms")   setSmsSent("sent");
-    if (method === "email") setEmailSent("sent");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Failed to send");
+      }
+
+      if (method === "sms")   setSmsSent("sent");
+      if (method === "email") setEmailSent("sent");
+    } catch (err) {
+      if (method === "sms")   setSmsSent("error");
+      if (method === "email") setEmailSent("error");
+      console.error(`Send ${method} failed:`, err);
+    }
   }
 
   async function copyLink() {
     await navigator.clipboard.writeText(shareUrl);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2500);
+  }
+
+  async function handleCashPaid() {
+    setCashError(null);
+    setMarking(true);
+    try {
+      await markJobCashPaid(jobId);
+    } catch (err) {
+      if (isNextInternalError(err)) throw err;
+      setCashError("Failed to mark as paid. Please try again.");
+      setMarking(false);
+    }
   }
 
   if (isPaid) {
@@ -64,11 +92,15 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
       <div className="card overflow-hidden divide-y divide-gray-100">
         {/* SMS */}
         <ActionRow
-          icon={<MessageSquare size={18} className="text-green-600" />}
-          iconBg="bg-green-50"
-          title={smsSent === "sent" ? "Sent!" : clientPhone ? `Text ${firstName}` : "Text client"}
+          icon={<MessageSquare size={18} className={smsSent === "error" ? "text-red-500" : "text-green-600"} />}
+          iconBg={smsSent === "error" ? "bg-red-50" : "bg-green-50"}
+          title={
+            smsSent === "sent"    ? "Sent!" :
+            smsSent === "error"   ? "Failed — tap to retry" :
+            clientPhone           ? `Text ${firstName}` : "Text client"
+          }
           subtitle={clientPhone ?? "No phone saved"}
-          disabled={!clientPhone || smsSent !== "idle"}
+          disabled={!clientPhone || smsSent === "sending"}
           loading={smsSent === "sending"}
           done={smsSent === "sent"}
           onClick={() => send("sms")}
@@ -76,11 +108,15 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
 
         {/* Email */}
         <ActionRow
-          icon={<Mail size={18} className="text-blue-600" />}
-          iconBg="bg-blue-50"
-          title={emailSent === "sent" ? "Sent!" : clientEmail ? `Email ${firstName}` : "Email client"}
+          icon={<Mail size={18} className={emailSent === "error" ? "text-red-500" : "text-blue-600"} />}
+          iconBg={emailSent === "error" ? "bg-red-50" : "bg-blue-50"}
+          title={
+            emailSent === "sent"  ? "Sent!" :
+            emailSent === "error" ? "Failed — tap to retry" :
+            clientEmail           ? `Email ${firstName}` : "Email client"
+          }
           subtitle={clientEmail ?? "No email saved"}
-          disabled={!clientEmail || emailSent !== "idle"}
+          disabled={!clientEmail || emailSent === "sending"}
           loading={emailSent === "sending"}
           done={emailSent === "sent"}
           onClick={() => send("email")}
@@ -100,8 +136,14 @@ export default function InvoiceSendButtons({ jobId, clientName, clientPhone, cli
       </div>
 
       {/* Cash */}
+      {cashError && (
+        <div className="flex items-center gap-2 px-1">
+          <AlertCircle size={14} className="text-red-500 shrink-0" />
+          <p className="text-xs text-red-500">{cashError}</p>
+        </div>
+      )}
       <button
-        onClick={async () => { setMarking(true); await markJobCashPaid(jobId); }}
+        onClick={handleCashPaid}
         disabled={marking}
         className="btn-ghost w-full flex items-center justify-center gap-2"
       >

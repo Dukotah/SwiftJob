@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 // POST /api/webhooks/stripe
 // Stripe calls this URL whenever something important happens —
 // most importantly, when a client pays an invoice.

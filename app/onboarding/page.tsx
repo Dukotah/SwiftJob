@@ -1,13 +1,12 @@
 "use client";
 
-// app/onboarding/page.tsx
-// Shown to new users on first login.
-// Collects business name, trade type, city, and state.
-// After submitting, they land on the home screen.
-
 import { useState } from "react";
 import { Zap } from "lucide-react";
 import { saveOnboarding } from "@/lib/actions";
+
+function isNextInternalError(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "digest" in err;
+}
 
 const TRADE_TYPES = [
   { value: "pressure_washing", label: "🚿 Pressure Washing" },
@@ -25,12 +24,20 @@ export default function OnboardingPage() {
   const [step,     setStep]     = useState(1);
   const [trade,    setTrade]    = useState("");
   const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError(null);
     setLoading(true);
-    const formData = new FormData(e.currentTarget);
-    await saveOnboarding(formData);
+    try {
+      const formData = new FormData(e.currentTarget);
+      await saveOnboarding(formData);
+    } catch (err) {
+      if (isNextInternalError(err)) throw err;
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -109,6 +116,12 @@ export default function OnboardingPage() {
         </div>
 
         <div className="flex-1" />
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+            <p className="text-sm text-red-600 font-medium">{error}</p>
+          </div>
+        )}
 
         <button
           type="submit"
