@@ -11,7 +11,7 @@ import { stripe } from "@/lib/stripe";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.id) return NextResponse.redirect("/login");
+  if (!session?.user?.id) return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"));
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, session.user.id),
