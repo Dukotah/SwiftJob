@@ -1,11 +1,4 @@
-// auth.ts — ROOT of your project (same level as package.json)
-//
-// This is the brain of your auth system. It tells Auth.js:
-//   - Which sign-in methods to offer (Google + magic link email)
-//   - Where to find users in your database
-//   - What data to include in the session
-
-import NextAuth from "next-auth";
+import NextAuth, { type DefaultSession } from "next-auth";
 import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
@@ -17,8 +10,16 @@ import {
   authVerificationTokens,
 } from "@/db/schema";
 
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      businessName: string | null;
+    } & DefaultSession["user"];
+  }
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Connects Auth.js to your Neon database via Drizzle
   adapter: DrizzleAdapter(db, {
     usersTable:              users,
     accountsTable:           authAccounts,
@@ -27,17 +28,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   }),
 
   providers: [
-    // ── Google Sign-In ──────────────────────────────────────────────────────
-    // Tradespeople tap "Continue with Google" — one tap, done.
-    // Set up at: console.cloud.google.com → APIs → Credentials → OAuth 2.0
     Google({
       clientId:     process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    // ── Magic Link Email ────────────────────────────────────────────────────
-    // User enters their email → gets a sign-in link → tap → logged in.
-    // No password. Great fallback for people without Google.
     Resend({
       apiKey: process.env.RESEND_API_KEY!,
       from:   process.env.RESEND_FROM_EMAIL!,
@@ -45,17 +40,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
 
   pages: {
-    // Use our custom login page instead of Auth.js's default one
     signIn: "/login",
     error:  "/login",
   },
 
   callbacks: {
-    // Add the user's database ID to their session token
-    // This lets you do: const session = await auth(); session.user.id
     session({ session, user }) {
       if (session.user) {
         session.user.id = user.id;
+        // businessName comes from the DB user row via the DrizzleAdapter.
+        // Storing it here avoids a second DB query in middleware.
+        session.user.businessName = (user as { businessName?: string | null }).businessName ?? null;
       }
       return session;
     },

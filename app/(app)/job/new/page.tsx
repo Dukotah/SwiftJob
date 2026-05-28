@@ -1,30 +1,86 @@
 "use client";
 
-// Job Capture — clean, fast, one-handed.
-// Inspired by Joist's simplicity: photo first, price last, one big CTA.
-
 import { useState } from "react";
-import { Camera, DollarSign, User, Phone, Mail, ArrowLeft } from "lucide-react";
+import { Camera, DollarSign, User, Phone, Mail, ArrowLeft, Loader2 } from "lucide-react";
 import { createJob } from "@/lib/actions";
+import { useUploadThing } from "@/lib/uploadthing-react";
 import Link from "next/link";
 
-export default function NewJobPage() {
-  const [beforePreview, setBeforePreview] = useState<string | null>(null);
-  const [afterPreview,  setAfterPreview]  = useState<string | null>(null);
-  const [submitting,    setSubmitting]    = useState(false);
+function isNextInternalError(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "digest" in err;
+}
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>, type: "before" | "after") {
+export default function NewJobPage() {
+  const [beforePreview,   setBeforePreview]   = useState<string | null>(null);
+  const [afterPreview,    setAfterPreview]     = useState<string | null>(null);
+  const [beforeUrl,       setBeforeUrl]        = useState<string | null>(null);
+  const [afterUrl,        setAfterUrl]         = useState<string | null>(null);
+  const [beforeUploading, setBeforeUploading]  = useState(false);
+  const [afterUploading,  setAfterUploading]   = useState(false);
+  const [submitting,      setSubmitting]       = useState(false);
+  const [error,           setError]            = useState<string | null>(null);
+
+  const { startUpload } = useUploadThing("jobPhoto");
+
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>, type: "before" | "after") {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    type === "before" ? setBeforePreview(url) : setAfterPreview(url);
+
+    // Show local preview immediately while the upload runs in the background
+    const previewUrl = URL.createObjectURL(file);
+    if (type === "before") {
+      setBeforePreview(previewUrl);
+      setBeforeUrl(null);
+      setBeforeUploading(true);
+    } else {
+      setAfterPreview(previewUrl);
+      setAfterUrl(null);
+      setAfterUploading(true);
+    }
+
+    try {
+      const result = await startUpload([file]);
+      const url = result?.[0]?.url;
+      if (url) {
+        type === "before" ? setBeforeUrl(url) : setAfterUrl(url);
+      } else {
+        // Upload succeeded but returned no URL — clear the preview
+        type === "before" ? setBeforePreview(null) : setAfterPreview(null);
+        setError("Photo upload failed. Please try again.");
+      }
+    } catch {
+      type === "before" ? setBeforePreview(null) : setAfterPreview(null);
+      setError("Photo upload failed. Please try again.");
+    } finally {
+      type === "before" ? setBeforeUploading(false) : setAfterUploading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError(null);
+
+    if (beforeUploading || afterUploading) {
+      setError("Please wait for photos to finish uploading.");
+      return;
+    }
+
     setSubmitting(true);
-    await createJob(new FormData(e.currentTarget));
+    try {
+      const formData = new FormData(e.currentTarget);
+      // Inject the Uploadthing CDN URLs that the server action expects
+      if (beforeUrl) formData.set("beforePhotoUrl", beforeUrl);
+      if (afterUrl)  formData.set("afterPhotoUrl",  afterUrl);
+      await createJob(formData);
+    } catch (err) {
+      // Re-throw Next.js redirect / notFound errors so navigation works
+      if (isNextInternalError(err)) throw err;
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setSubmitting(false);
+    }
   }
+
+  const isUploading = beforeUploading || afterUploading;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -45,9 +101,9 @@ export default function NewJobPage() {
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Photos</p>
           <div className="grid grid-cols-2 gap-3">
-            <PhotoTile label="Before" id="before" preview={beforePreview}
+            <PhotoTile label="Before" id="before" preview={beforePreview} uploading={beforeUploading}
               onChange={(e) => handlePhoto(e, "before")} />
-            <PhotoTile label="After"  id="after"  preview={afterPreview}
+            <PhotoTile label="After"  id="after"  preview={afterPreview}  uploading={afterUploading}
               onChange={(e) => handlePhoto(e, "after")} />
           </div>
         </div>
@@ -66,7 +122,6 @@ export default function NewJobPage() {
               />
             </div>
 
-            {/* Total — big and obvious */}
             <div>
               <label className="text-xs text-gray-500 font-medium mb-1 block">Total ($)</label>
               <div className="relative">
@@ -107,9 +162,20 @@ export default function NewJobPage() {
           </div>
         </div>
 
+        {/* Error message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+            <p className="text-sm text-red-600 font-medium">{error}</p>
+          </div>
+        )}
+
         {/* ── CTA ─────────────────────────────────────── */}
-        <button type="submit" disabled={submitting} className="btn-primary">
-          {submitting ? "Creating invoice..." : "Generate Invoice →"}
+        <button type="submit" disabled={submitting || isUploading} className="btn-primary">
+          {isUploading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 size={16} className="animate-spin" /> Uploading photos...
+            </span>
+          ) : submitting ? "Creating invoice..." : "Generate Invoice →"}
         </button>
 
       </form>
@@ -117,10 +183,11 @@ export default function NewJobPage() {
   );
 }
 
-function PhotoTile({ label, id, preview, onChange }: {
+function PhotoTile({ label, id, preview, uploading, onChange }: {
   label: string;
   id: string;
   preview: string | null;
+  uploading: boolean;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
@@ -130,8 +197,15 @@ function PhotoTile({ label, id, preview, onChange }: {
         preview ? "border-transparent" : "border-dashed border-gray-200 bg-white"
       }`}>
         {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt={label} className="w-full h-full object-cover" />
+          <div className="relative w-full h-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt={label} className="w-full h-full object-cover" />
+            {uploading && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <Loader2 size={24} className="text-white animate-spin" />
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col items-center gap-2 p-4">
             <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
