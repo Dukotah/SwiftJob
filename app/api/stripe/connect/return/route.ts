@@ -1,3 +1,7 @@
+// Force dynamic rendering — this route calls auth() which reads cookies
+// and cannot be statically pre-rendered at build time.
+export const dynamic = "force-dynamic";
+
 // GET /api/stripe/connect/return
 // Stripe redirects the tradesperson here after they finish onboarding.
 // We verify the account is active and mark them as fully onboarded.
