@@ -6,7 +6,7 @@ import { auth, signOut } from "@/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { ExternalLink, CreditCard, Globe, Star, CheckCircle, ChevronRight, AlertCircle, Building2, Pencil, MessageSquare } from "lucide-react";
+import { ExternalLink, CreditCard, Globe, Star, CheckCircle, ChevronRight, AlertCircle, Building2, Pencil, MessageSquare, Code2 } from "lucide-react";
 import Link from "next/link";
 
 export default async function ProfilePage({
@@ -280,6 +280,18 @@ export default async function ProfilePage({
                 <p className="font-semibold text-gray-900 text-sm truncate">{user.name ?? user.email}</p>
               </div>
             </div>
+
+            {/* Dev quick nav */}
+            <Link
+              href="/dev"
+              className="flex items-center gap-4 px-4 py-4 active:bg-gray-50 transition-colors"
+            >
+              <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
+                <Code2 size={20} className="text-violet-500" />
+              </div>
+              <p className="flex-1 font-semibold text-gray-700 text-sm">Developer Quick Nav</p>
+              <ChevronRight size={16} className="text-gray-300 shrink-0" />
+            </Link>
 
             <form
               action={async () => {
