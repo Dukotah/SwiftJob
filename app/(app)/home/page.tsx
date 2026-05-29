@@ -3,8 +3,8 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { jobs, users } from "@/db/schema";
-import { eq, and, gte, desc } from "drizzle-orm";
+import { jobs, users, reviewFeedback } from "@/db/schema";
+import { eq, and, gte, desc, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { centsToDisplay, formatRelativeDate } from "@/lib/utils";
 import {
@@ -19,6 +19,8 @@ import {
   CreditCard,
   Camera,
   Plus,
+  MessageSquare,
+  Image,
 } from "lucide-react";
 
 // ── Activity feed helpers ────────────────────────────────────────────────────
@@ -47,7 +49,8 @@ export default async function HomePage() {
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
-  const [user, monthJobs, activityJobs] = await Promise.all([
+  // Fetch all user jobs first so we can filter by ID for feedback query
+  const [user, monthJobs, activityJobs, allUserJobIds] = await Promise.all([
     db.query.users.findFirst({
       where: eq(users.id, userId),
       columns: { stripeOnboardingDone: true },
@@ -63,7 +66,20 @@ export default async function HomePage() {
       orderBy: [desc(jobs.updatedAt)],
       limit: 10,
     }),
+    db.query.jobs.findMany({
+      where: eq(jobs.userId, userId),
+      columns: { id: true },
+    }),
   ]);
+
+  // Count unread private feedback (1-3 star reviews that were intercepted)
+  const jobIds = allUserJobIds.map((j) => j.id);
+  const feedbackCount = jobIds.length
+    ? (await db.query.reviewFeedback.findMany({
+        where: inArray(reviewFeedback.jobId, jobIds),
+        columns: { id: true },
+      })).length
+    : 0;
 
   // ── Aggregate stats ────────────────────────────────────────────────────────
 
@@ -92,6 +108,26 @@ export default async function HomePage() {
       </div>
 
       <div className="px-4 py-4 space-y-3">
+
+        {/* ── Private feedback alert ────────────────────── */}
+        {feedbackCount > 0 && (
+          <Link href="/feedback">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 active:bg-amber-100 transition-colors">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+                <MessageSquare size={18} className="text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-amber-900 text-sm">
+                  {feedbackCount} private {feedbackCount === 1 ? "review" : "reviews"} to check
+                </p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  Client feedback that didn&apos;t go to Google →
+                </p>
+              </div>
+              <ChevronRight size={16} className="text-amber-400 shrink-0" />
+            </div>
+          </Link>
+        )}
 
         {/* ── Stripe connect prompt ──────────────────────── */}
         {!user?.stripeOnboardingDone && (
@@ -194,7 +230,7 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {/* ── Quick actions row ─────────────────────────── */}
+        {/* ── Quick actions grid ────────────────────────── */}
         <div className="grid grid-cols-2 gap-3">
           <Link href="/job/new">
             <div className="card p-4 flex items-center gap-3 active:bg-gray-50 transition-colors h-full">
@@ -215,6 +251,30 @@ export default async function HomePage() {
               <div>
                 <p className="font-semibold text-gray-900 text-sm">Clients</p>
                 <p className="text-xs text-gray-400">Your customer list</p>
+              </div>
+            </div>
+          </Link>
+          <Link href="/gallery">
+            <div className="card p-4 flex items-center gap-3 active:bg-gray-50 transition-colors h-full">
+              <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                <Image size={16} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Portfolio</p>
+                <p className="text-xs text-gray-400">Posts & gallery</p>
+              </div>
+            </div>
+          </Link>
+          <Link href="/feedback">
+            <div className={`card p-4 flex items-center gap-3 active:bg-gray-50 transition-colors h-full ${feedbackCount > 0 ? "border-amber-200 bg-amber-50/50" : ""}`}>
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${feedbackCount > 0 ? "bg-amber-100" : "bg-gray-50"}`}>
+                <MessageSquare size={16} className={feedbackCount > 0 ? "text-amber-600" : "text-gray-400"} />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Feedback</p>
+                <p className="text-xs text-gray-400">
+                  {feedbackCount > 0 ? `${feedbackCount} new` : "Private reviews"}
+                </p>
               </div>
             </div>
           </Link>

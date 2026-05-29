@@ -9,11 +9,13 @@ const ROUTE_GROUPS = [
   {
     label: "Main Screens",
     routes: [
-      { label: "Home",       href: "/home" },
-      { label: "All Jobs",   href: "/jobs" },
-      { label: "Analytics",  href: "/analytics" },
-      { label: "Clients",    href: "/clients" },
-      { label: "Profile",    href: "/profile" },
+      { label: "Home",             href: "/home" },
+      { label: "All Jobs",         href: "/jobs" },
+      { label: "Analytics",        href: "/analytics" },
+      { label: "Clients",          href: "/clients" },
+      { label: "Portfolio & Posts", href: "/gallery" },
+      { label: "Private Feedback", href: "/feedback" },
+      { label: "Profile",          href: "/profile" },
     ],
   },
   {

@@ -247,23 +247,16 @@ export default async function ProfilePage({
             </div>
 
             {/* Portfolio page */}
-            <div className="flex items-center gap-4 px-4 py-4">
+            <Link href="/gallery" className="flex items-center gap-4 px-4 py-4 active:bg-gray-50 transition-colors">
               <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center shrink-0">
                 <Globe size={20} className="text-purple-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm">Public Portfolio</p>
-                <p className="text-xs text-gray-400 mt-0.5 truncate">{galleryUrl}</p>
+                <p className="font-semibold text-gray-900 text-sm">Portfolio & Post History</p>
+                <p className="text-xs text-gray-400 mt-0.5 truncate">Manage visibility + GBP posts</p>
               </div>
-              <a
-                href={galleryUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0"
-              >
-                <ExternalLink size={18} className="text-blue-500" />
-              </a>
-            </div>
+              <ChevronRight size={16} className="text-gray-300 shrink-0" />
+            </Link>
           </div>
         </div>
 

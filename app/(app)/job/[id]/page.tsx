@@ -1,6 +1,7 @@
 // Screen — Job Detail
 // Shows a completed job with its photos, description, amount, and status.
 // Draft jobs can be edited or deleted. Non-paid jobs show the invoice CTA.
+// Paid jobs show social post button, review request, and full automation timeline.
 
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -9,7 +10,7 @@ import { jobs } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import Link from "next/link";
 import { centsToDisplay, formatDate } from "@/lib/utils";
-import { Pencil, Sparkles } from "lucide-react";
+import { Pencil, Sparkles, Star } from "lucide-react";
 import { DeleteJobButton } from "./delete-button";
 import { SendReviewButton } from "@/components/send-review-button";
 
@@ -20,7 +21,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   const job = await db.query.jobs.findFirst({
     where: and(eq(jobs.id, id), eq(jobs.userId, session.user.id)),
-    with: { client: true, photos: true, invoice: true },
+    with: {
+      client:         true,
+      photos:         true,
+      invoice:        true,
+      galleryPost:    true,
+      reviewFeedback: true,
+    },
   });
 
   if (!job) notFound();
@@ -32,8 +39,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   };
   const STATUS_LABELS = { draft: "Draft", invoiced: "Sent", paid: "Paid ✓" };
 
-  const canEdit   = job.status !== "paid";
-  const canDelete = job.status === "draft";
+  const canEdit      = job.status !== "paid";
+  const canDelete    = job.status === "draft";
+  const postedToGbp  = !!job.galleryPost?.gbpPostId;
+  const feedback     = job.reviewFeedback;
 
   return (
     <div className="px-4 pt-6 pb-8 min-h-screen bg-slate-50">
@@ -46,6 +55,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_STYLES[job.status]}`}>
             {STATUS_LABELS[job.status]}
           </span>
+
+          {/* GBP posted badge */}
+          {postedToGbp && (
+            <span className="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded-full">
+              🗺️ On Google
+            </span>
+          )}
 
           {/* Edit button — only for non-paid jobs */}
           {canEdit && (
@@ -102,13 +118,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </Link>
       )}
 
-      {/* Create Post — AI caption generator (always available, photos are a bonus) */}
+      {/* Create / manage social post */}
       <Link
         href={`/job/${job.id}/content`}
         className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-blue-600 to-violet-600 text-white py-3.5 rounded-2xl font-bold text-center text-sm active:opacity-90 mb-3 shadow-sm shadow-blue-200"
       >
         <Sparkles size={16} />
-        Create Social Post
+        {postedToGbp ? "View / Repost" : "Create Social Post"}
       </Link>
 
       {/* Review request — paid jobs only */}
@@ -122,15 +138,42 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </div>
       )}
 
+      {/* Private feedback — only shown if client left 1-3 star feedback */}
+      {feedback && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+              <Star size={16} className="text-amber-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-900 mb-1">
+                Private feedback — {feedback.rating}/5 stars
+              </p>
+              {feedback.comment ? (
+                <p className="text-sm text-amber-800 italic leading-relaxed">
+                  &ldquo;{feedback.comment}&rdquo;
+                </p>
+              ) : (
+                <p className="text-xs text-amber-600">No written comment.</p>
+              )}
+              <p className="text-xs text-amber-500 mt-1">{formatDate(feedback.createdAt)}</p>
+            </div>
+          </div>
+          <p className="text-xs text-amber-600 mt-2 pl-12">
+            This never went to Google. Consider following up with {job.client?.name?.split(" ")[0] ?? "the client"}.
+          </p>
+        </div>
+      )}
+
       {/* Repeat job — pre-fills new job form with same client */}
       {job.client && (() => {
-        const params = new URLSearchParams();
-        if (job.client.name)  params.set("clientName",  job.client.name);
-        if (job.client.phone) params.set("clientPhone", job.client.phone);
-        if (job.client.email) params.set("clientEmail", job.client.email);
+        const clientParams = new URLSearchParams();
+        if (job.client.name)  clientParams.set("clientName",  job.client.name);
+        if (job.client.phone) clientParams.set("clientPhone", job.client.phone);
+        if (job.client.email) clientParams.set("clientEmail", job.client.email);
         return (
           <Link
-            href={`/job/new?${params.toString()}`}
+            href={`/job/new?${clientParams.toString()}`}
             className="block w-full border border-gray-200 bg-white text-gray-600 py-3.5 rounded-2xl font-semibold text-center text-sm active:bg-gray-50 mb-3"
           >
             Repeat for {job.client.name.split(" ")[0]} →
@@ -138,21 +181,14 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         );
       })()}
 
-      {/* ── Job Timeline ─────────────────────────────────── */}
+      {/* ── Full Automation Timeline ──────────────────────── */}
       <div className="mt-2">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1 mb-3">History</p>
         <div className="relative pl-6 space-y-0">
-          {/* Vertical line */}
           <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gray-100" />
 
-          {/* Created */}
-          <TimelineEvent
-            dot="bg-gray-300"
-            label="Job created"
-            date={formatDate(job.createdAt)}
-          />
+          <TimelineEvent dot="bg-gray-300"   label="Job created"            date={formatDate(job.createdAt)} />
 
-          {/* Invoice sent */}
           {job.invoice?.sentAt && (
             <TimelineEvent
               dot="bg-amber-400"
@@ -165,13 +201,52 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             />
           )}
 
-          {/* Paid */}
+          {job.invoice?.paymentReminderSentAt && (
+            <TimelineEvent
+              dot="bg-orange-400"
+              label="Payment reminder sent"
+              date={formatDate(job.invoice.paymentReminderSentAt)}
+            />
+          )}
+
           {job.paidAt && (
             <TimelineEvent
               dot="bg-emerald-500"
               label="Payment received 💰"
               date={formatDate(job.paidAt)}
               highlight
+            />
+          )}
+
+          {job.invoice?.reviewRequestSentAt && (
+            <TimelineEvent
+              dot="bg-yellow-400"
+              label="Review request sent ⭐"
+              date={formatDate(job.invoice.reviewRequestSentAt)}
+            />
+          )}
+
+          {feedback && (
+            <TimelineEvent
+              dot="bg-amber-500"
+              label={`Private feedback received (${feedback.rating}/5 ★)`}
+              date={formatDate(feedback.createdAt)}
+            />
+          )}
+
+          {job.galleryPost?.gbpPostedAt && (
+            <TimelineEvent
+              dot="bg-blue-500"
+              label="Posted to Google Business 🗺️"
+              date={formatDate(job.galleryPost.gbpPostedAt)}
+            />
+          )}
+
+          {job.invoice?.followUpSentAt && (
+            <TimelineEvent
+              dot="bg-purple-400"
+              label="30-day follow-up sent"
+              date={formatDate(job.invoice.followUpSentAt)}
             />
           )}
         </div>

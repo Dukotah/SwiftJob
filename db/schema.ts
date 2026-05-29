@@ -197,8 +197,9 @@ export const invoices = pgTable("invoices", {
   paidAt:  timestamp("paid_at"),
 
   // Automation tracking — prevent duplicate sends
-  reviewRequestSentAt: timestamp("review_request_sent_at"), // When we texted/emailed asking for a review
-  followUpSentAt:      timestamp("follow_up_sent_at"),       // When we sent the 30-day "need anything?" follow-up
+  reviewRequestSentAt:   timestamp("review_request_sent_at"),   // When we texted/emailed asking for a review
+  followUpSentAt:        timestamp("follow_up_sent_at"),         // When we sent the 30-day "need anything?" follow-up
+  paymentReminderSentAt: timestamp("payment_reminder_sent_at"),  // When we texted the unpaid reminder
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

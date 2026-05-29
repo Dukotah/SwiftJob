@@ -22,8 +22,9 @@ export async function GET(req: NextRequest) {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS gbp_location_name TEXT`;
 
     // New columns on invoices
-    await sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS review_request_sent_at TIMESTAMP`;
-    await sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS follow_up_sent_at      TIMESTAMP`;
+    await sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS review_request_sent_at   TIMESTAMP`;
+    await sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS follow_up_sent_at        TIMESTAMP`;
+    await sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_reminder_sent_at TIMESTAMP`;
 
     // New table: private review feedback
     await sql`
