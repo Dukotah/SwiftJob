@@ -266,4 +266,4 @@ export default async function GalleryPage({ params }: Props) {
                     </div>
               </div>
             );
-}</div>
+}
